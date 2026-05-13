@@ -1,0 +1,33 @@
+import React from 'react';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
+import HeroSection from '@/app/components/HeroSection';
+import CategoriesSection from '@/app/components/CategoriesSection';
+import BestSellersSection from '@/app/components/BestSellersSection';
+import PromotionBanner from '@/app/components/PromotionBanner';
+import ReviewsSection from '@/app/components/ReviewsSection';
+import ScrollAnimationInit from '@/app/components/ScrollAnimationInit';
+
+export default function HomePage() {
+  return (
+    <main className="min-h-screen bg-background overflow-x-hidden">
+      <ScrollAnimationInit />
+
+      {/* Decorative grid lines */}
+      <div className="grid-lines-overlay pointer-events-none" aria-hidden>
+        <div className="grid-line-v" />
+        <div className="grid-line-v hidden md:block" />
+        <div className="grid-line-v hidden md:block" />
+        <div className="grid-line-v" />
+      </div>
+
+      <Header />
+      <HeroSection />
+      <CategoriesSection />
+      <BestSellersSection />
+      <PromotionBanner />
+      <ReviewsSection />
+      <Footer />
+    </main>
+  );
+}
