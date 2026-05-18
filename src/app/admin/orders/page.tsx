@@ -1,6 +1,6 @@
 import React from 'react';
-import AdminOrdersClient from '@/app/admin-orders/components/AdminOrdersClient';
-import AdminSidebar from '@/app/admin-dashboard/components/AdminSidebar';
+import AdminOrdersClient from '@/components/features/admin/AdminOrdersClient';
+import AdminSidebar from '@/components/features/dashboard/AdminSidebar';
 
 export default function AdminOrdersPage() {
   return (

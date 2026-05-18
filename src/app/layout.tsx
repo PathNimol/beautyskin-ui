@@ -19,7 +19,8 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
   title: 'BS Online Shop — Premium Beauty & Skincare',
-  description: 'Discover premium Korean-inspired skincare at BS Online Shop. Shop moisturizers, serums, cleansers and more. Free shipping on orders over $50.',
+  description:
+    'Discover premium Korean-inspired skincare at BS Online Shop. Shop moisturizers, serums, cleansers and more. Free shipping on orders over $50.',
   icons: {
     icon: [{ url: '/favicon.ico', type: 'image/x-icon' }],
   },
@@ -30,16 +31,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={plusJakartaSans.variable}>
       <body className={plusJakartaSans.className}>
-        <MockAuthProvider>
-          {children}
-        </MockAuthProvider>
-</body>
+        <MockAuthProvider>{children}</MockAuthProvider>
+      </body>
     </html>
   );
 }

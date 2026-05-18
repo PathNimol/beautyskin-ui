@@ -7,12 +7,62 @@ import AppImage from '@/components/ui/AppImage';
 import { MOCK_USERS } from '@/lib/mock/data';
 
 const MOCK_CUSTOMERS = MOCK_USERS.filter((u) => u.role === 'buyer').concat([
-{ id: 'cust-002', email: 'meilin@email.com', name: 'Mei-Lin Tanaka', role: 'buyer' as const, avatar: "https://img.rocket.new/generatedImages/rocket_gen_img_12681620f-1763300830972.png", avatarAlt: 'Mei-Lin Tanaka', phone: '+1 555-0102', joinDate: 'Jul 5, 2024' },
-{ id: 'cust-003', email: 'priya.s@email.com', name: 'Priya Sharma', role: 'buyer' as const, avatar: "https://img.rocket.new/generatedImages/rocket_gen_img_1100754ec-1772440845407.png", avatarAlt: 'Priya Sharma', phone: '+1 555-0103', joinDate: 'Aug 12, 2024' },
-{ id: 'cust-004', email: 'sophie.w@email.com', name: 'Sophie Williams', role: 'buyer' as const, avatar: "https://img.rocket.new/generatedImages/rocket_gen_img_103b528db-1763293982935.png", avatarAlt: 'Sophie Williams', phone: '+1 555-0104', joinDate: 'Sep 3, 2024' },
-{ id: 'cust-005', email: 'aiko.n@email.com', name: 'Aiko Nakamura', role: 'buyer' as const, avatar: "https://images.unsplash.com/photo-1668049221607-1f2df20621cc", avatarAlt: 'Aiko Nakamura', phone: '+1 555-0105', joinDate: 'Oct 18, 2024' },
-{ id: 'cust-006', email: 'fatima.ah@email.com', name: 'Fatima Al-Hassan', role: 'buyer' as const, avatar: "https://img.rocket.new/generatedImages/rocket_gen_img_10b618970-1772939771929.png", avatarAlt: 'Fatima Al-Hassan', phone: '+1 555-0106', joinDate: 'Nov 7, 2024' }]
-);
+  {
+    id: 'cust-002',
+    email: 'meilin@email.com',
+    password: '',
+    name: 'Mei-Lin Tanaka',
+    role: 'buyer' as const,
+    avatar: 'https://img.rocket.new/generatedImages/rocket_gen_img_12681620f-1763300830972.png',
+    avatarAlt: 'Mei-Lin Tanaka',
+    phone: '+1 555-0102',
+    joinDate: 'Jul 5, 2024',
+  },
+  {
+    id: 'cust-003',
+    email: 'priya.s@email.com',
+    password: '',
+    name: 'Priya Sharma',
+    role: 'buyer' as const,
+    avatar: 'https://img.rocket.new/generatedImages/rocket_gen_img_1100754ec-1772440845407.png',
+    avatarAlt: 'Priya Sharma',
+    phone: '+1 555-0103',
+    joinDate: 'Aug 12, 2024',
+  },
+  {
+    id: 'cust-004',
+    email: 'sophie.w@email.com',
+    password: '',
+    name: 'Sophie Williams',
+    role: 'buyer' as const,
+    avatar: 'https://img.rocket.new/generatedImages/rocket_gen_img_103b528db-1763293982935.png',
+    avatarAlt: 'Sophie Williams',
+    phone: '+1 555-0104',
+    joinDate: 'Sep 3, 2024',
+  },
+  {
+    id: 'cust-005',
+    email: 'aiko.n@email.com',
+    password: '',
+    name: 'Aiko Nakamura',
+    role: 'buyer' as const,
+    avatar: 'https://images.unsplash.com/photo-1668049221607-1f2df20621cc',
+    avatarAlt: 'Aiko Nakamura',
+    phone: '+1 555-0105',
+    joinDate: 'Oct 18, 2024',
+  },
+  {
+    id: 'cust-006',
+    email: 'fatima.ah@email.com',
+    password: '',
+    name: 'Fatima Al-Hassan',
+    role: 'buyer' as const,
+    avatar: 'https://img.rocket.new/generatedImages/rocket_gen_img_10b618970-1772939771929.png',
+    avatarAlt: 'Fatima Al-Hassan',
+    phone: '+1 555-0106',
+    joinDate: 'Nov 7, 2024',
+  },
+]);
 
 export default function CustomersClient() {
   const [search, setSearch] = useState('');

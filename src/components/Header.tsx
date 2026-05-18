@@ -30,7 +30,9 @@ export default function Header() {
     } else {
       document.body.style.overflow = '';
     }
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [menuOpen]);
 
   const dashboardHref = role === 'buyer' ? '/customer-account' : '/dashboard';
@@ -39,15 +41,13 @@ export default function Header() {
     <>
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-          scrolled
-            ? 'bg-white/90 backdrop-blur-xl shadow-card py-3'
-            : 'bg-transparent py-5'
+          scrolled ? 'bg-white/90 backdrop-blur-xl shadow-card py-3' : 'bg-transparent py-5'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-5 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 group">
-            <AppLogo size={36} />
+            <AppLogo size={50} />
             <span className="font-display font-bold text-lg tracking-tight text-foreground group-hover:text-accent transition-colors">
               BS Online Shop
             </span>
@@ -177,7 +177,10 @@ export default function Header() {
                       {role === 'buyer' ? 'My Account' : 'Dashboard'}
                     </Link>
                     <button
-                      onClick={() => { signOut(); setMenuOpen(false); }}
+                      onClick={() => {
+                        signOut();
+                        setMenuOpen(false);
+                      }}
                       className="w-full flex items-center gap-2 px-4 py-3 bg-secondary text-foreground rounded-xl font-semibold hover:bg-border transition-all"
                     >
                       <Icon name="ArrowRightOnRectangleIcon" size={16} />
