@@ -18,7 +18,7 @@ Use this as a **repeatable QA walkthrough** for anyone validating the repo on a 
 ### 2. Clone and install
 
 ```bash
-git clone <repository-url> bsonlineshop
+git clone https://github.com/PathNimol/beautyskin-ui.git
 cd bsonlineshop
 yarn install
 # or: npm install
