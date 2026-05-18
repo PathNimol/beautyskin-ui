@@ -1,13 +1,16 @@
 'use client';
-// src/app/customers/CustomersClient.tsx
-// Fixed imports: @/types/userManagement, @/components/UserFormModal, etc.
+// src/components/features/shop/ShopUsersClient.tsx — per-shop user management (admin).
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import {
-  MOCK_CUSTOMERS,
+  MOCK_SHOP_USERS,
+  MOCK_SHOPS,
   STATUS_STYLES,
+  ROLE_STYLES,
   type ManagedUser,
+  type UserRole,
   type UserStatus,
 } from '@/types/userManagement';
 import UserFormModal from '@/components/UserFormModel';
@@ -61,22 +64,22 @@ function ResetPasswordModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const [newPw, setNewPw] = useState('');
-  const [confirmPw, setConfirmPw] = useState('');
+  const [pw, setPw] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState('');
+  const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handle = () => {
-    if (newPw.length < 6) {
-      setError('Min 6 characters');
+    if (pw.length < 6) {
+      setErr('Min 6 characters');
       return;
     }
-    if (newPw !== confirmPw) {
-      setError('Passwords do not match');
+    if (pw !== confirm) {
+      setErr('Passwords do not match');
       return;
     }
-    setError('');
+    setErr('');
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
@@ -93,18 +96,18 @@ function ResetPasswordModal({
         </div>
         <h3 className="text-lg font-extrabold text-foreground text-center mb-1">Reset Password</h3>
         <p className="text-xs text-muted-foreground text-center mb-5">
-          Set a new password for{' '}
+          For{' '}
           <span className="font-semibold text-foreground">
             {user.firstName} {user.lastName}
           </span>
         </p>
-        {error && <p className="text-xs text-red-500 text-center mb-3">{error}</p>}
+        {err && <p className="text-xs text-red-500 text-center mb-3">{err}</p>}
         <div className="space-y-3 mb-5">
           <div className="relative">
             <input
               type={showPw ? 'text' : 'password'}
-              value={newPw}
-              onChange={(e) => setNewPw(e.target.value)}
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
               placeholder="New password"
               className="w-full px-4 py-2.5 pr-10 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
             />
@@ -118,9 +121,9 @@ function ResetPasswordModal({
           </div>
           <input
             type="password"
-            value={confirmPw}
-            onChange={(e) => setConfirmPw(e.target.value)}
-            placeholder="Confirm new password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="Confirm password"
             className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
           />
         </div>
@@ -148,10 +151,22 @@ function ResetPasswordModal({
   );
 }
 
+// ─── Role tabs ────────────────────────────────────────────────────────────────
+const SHOP_ROLES: Array<UserRole | 'all'> = ['all', 'Owner', 'Staff'];
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function CustomersClient() {
-  const [users, setUsers] = useState<ManagedUser[]>(MOCK_CUSTOMERS);
+interface Props {
+  shopId: string;
+}
+
+export default function ShopUsersClient({ shopId }: Props) {
+  const shop = MOCK_SHOPS.find(
+    (s: { id: string; name: string; status: string }) => s.id === shopId
+  );
+  const [allUsers, setAllUsers] = useState<ManagedUser[]>(MOCK_SHOP_USERS);
+
   const [search, setSearch] = useState('');
+  const [roleTab, setRoleTab] = useState<UserRole | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
 
   const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
@@ -166,38 +181,46 @@ export default function CustomersClient() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  const shopUsers = useMemo(
+    () => allUsers.filter((u: ManagedUser) => u.shopId === shopId),
+    [allUsers, shopId]
+  );
+
   const filtered = useMemo(
     () =>
-      users.filter((u: ManagedUser) => {
+      shopUsers.filter((u: ManagedUser) => {
         const q = search.toLowerCase();
         const matchSearch =
           !q || `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q);
+        const matchRole = roleTab === 'all' || u.role === roleTab;
         const matchStatus = statusFilter === 'all' || u.status === statusFilter;
-        return matchSearch && matchStatus;
+        return matchSearch && matchRole && matchStatus;
       }),
-    [users, search, statusFilter]
+    [shopUsers, search, roleTab, statusFilter]
   );
 
   const stats = useMemo(
     () => ({
-      total: users.length,
-      active: users.filter((u: ManagedUser) => u.status === 'active').length,
-      inactive: users.filter((u: ManagedUser) => u.status === 'inactive').length,
-      suspended: users.filter((u: ManagedUser) => u.status === 'suspended').length,
+      total: shopUsers.length,
+      owners: shopUsers.filter((u: ManagedUser) => u.role === 'Owner').length,
+      staff: shopUsers.filter((u: ManagedUser) => u.role === 'Staff').length,
+      active: shopUsers.filter((u: ManagedUser) => u.status === 'active').length,
     }),
-    [users]
+    [shopUsers]
   );
 
   const handleSave = (data: Partial<ManagedUser>) => {
     if (formMode === 'create') {
       const newUser: ManagedUser = {
-        id: `c${Date.now()}`,
+        id: `u${Date.now()}`,
         firstName: data.firstName ?? '',
         lastName: data.lastName ?? '',
         email: data.email ?? '',
         phone: data.phone,
-        role: 'Customer',
+        role: (data.role as UserRole) ?? 'Staff',
         status: data.status ?? 'active',
+        shopId,
+        shopName: shop?.name,
         joinedAt: new Date().toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
@@ -208,10 +231,10 @@ export default function CustomersClient() {
           { action: 'Account created by admin', timestamp: new Date().toLocaleString() },
         ],
       };
-      setUsers((prev) => [newUser, ...prev]);
-      showToast(`${newUser.firstName} ${newUser.lastName} created successfully.`);
+      setAllUsers((prev) => [...prev, newUser]);
+      showToast(`${newUser.firstName} ${newUser.lastName} added to ${shop?.name}.`);
     } else if (editTarget) {
-      setUsers((prev) =>
+      setAllUsers((prev) =>
         prev.map((u: ManagedUser) =>
           u.id === editTarget.id
             ? {
@@ -233,14 +256,14 @@ export default function CustomersClient() {
 
   const handleDelete = () => {
     if (!deleteTarget) return;
-    setUsers((prev) => prev.filter((u: ManagedUser) => u.id !== deleteTarget.id));
-    showToast(`${deleteTarget.firstName} ${deleteTarget.lastName} deleted.`);
+    setAllUsers((prev) => prev.filter((u: ManagedUser) => u.id !== deleteTarget.id));
+    showToast(`${deleteTarget.firstName} ${deleteTarget.lastName} removed.`);
     setDeleteTarget(null);
     if (activityUser?.id === deleteTarget.id) setActivityUser(null);
   };
 
-  const toggleStatus = (userId: string, status: UserStatus) => {
-    setUsers((prev) =>
+  const handleToggleStatus = (userId: string, status: UserStatus) => {
+    setAllUsers((prev) =>
       prev.map((u: ManagedUser) =>
         u.id === userId
           ? {
@@ -259,7 +282,7 @@ export default function CustomersClient() {
 
   const handleResetDone = () => {
     if (!resetTarget) return;
-    setUsers((prev) =>
+    setAllUsers((prev) =>
       prev.map((u: ManagedUser) =>
         u.id === resetTarget.id
           ? {
@@ -277,16 +300,42 @@ export default function CustomersClient() {
     setActivityUser(null);
   };
 
+  if (!shop) {
+    return (
+      <div className="p-6 md:p-8 min-h-screen bg-admin-bg flex flex-col items-center justify-center gap-4">
+        <Icon name="BuildingStorefrontIcon" size={48} className="text-border" />
+        <h1 className="text-xl font-bold text-foreground">Shop not found</h1>
+        <Link
+          href="/admin/shops"
+          className="flex items-center gap-2 text-sm text-accent hover:text-gold-deep font-semibold transition-colors"
+        >
+          <Icon name="ArrowLeftIcon" size={15} /> Back to Shops
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 md:p-8 min-h-screen bg-admin-bg">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-6 pl-10 md:pl-0">
+        <Link href="/admin/shops" className="hover:text-foreground transition-colors">
+          Shops
+        </Link>
+        <Icon name="ChevronRightIcon" size={12} />
+        <span className="text-foreground font-semibold">{shop.name}</span>
+        <Icon name="ChevronRightIcon" size={12} />
+        <span className="text-foreground font-semibold">Users</span>
+      </div>
+
       {/* Header */}
-      <div className="flex items-center justify-between mb-8 pl-10 md:pl-0">
+      <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-tight">
-            Customers
+            {shop.name}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            All registered customers across the platform
+            Manage owners and staff for this shop
           </p>
         </div>
         <button
@@ -297,7 +346,7 @@ export default function CustomersClient() {
           className="flex items-center gap-2 px-4 py-2.5 bg-primary text-foreground text-sm font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose"
         >
           <Icon name="UserPlusIcon" size={16} />
-          <span className="hidden sm:inline">Add Customer</span>
+          <span className="hidden sm:inline">Add User</span>
         </button>
       </div>
 
@@ -305,9 +354,21 @@ export default function CustomersClient() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
           {
-            label: 'Total',
+            label: 'Total Users',
             value: stats.total,
             icon: 'UsersIcon',
+            color: 'bg-blue-50 text-blue-600',
+          },
+          {
+            label: 'Owners',
+            value: stats.owners,
+            icon: 'BuildingStorefrontIcon',
+            color: 'bg-rose-50 text-rose-600',
+          },
+          {
+            label: 'Staff',
+            value: stats.staff,
+            icon: 'UserGroupIcon',
             color: 'bg-blue-50 text-blue-600',
           },
           {
@@ -315,18 +376,6 @@ export default function CustomersClient() {
             value: stats.active,
             icon: 'CheckCircleIcon',
             color: 'bg-green-50 text-green-600',
-          },
-          {
-            label: 'Inactive',
-            value: stats.inactive,
-            icon: 'PauseCircleIcon',
-            color: 'bg-secondary text-muted-foreground',
-          },
-          {
-            label: 'Suspended',
-            value: stats.suspended,
-            icon: 'NoSymbolIcon',
-            color: 'bg-red-50 text-red-600',
           },
         ].map((kpi) => (
           <div key={kpi.label} className="admin-glass rounded-2xl p-4 shadow-card">
@@ -336,15 +385,33 @@ export default function CustomersClient() {
               <Icon name={kpi.icon as Parameters<typeof Icon>[0]['name']} size={17} />
             </div>
             <p className="text-xl font-extrabold text-foreground">{kpi.value}</p>
-            <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-              {kpi.label} Customers
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5 font-medium">{kpi.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Search + Filter */}
+      {/* Role tabs + search + status filter */}
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <div className="flex items-center gap-1 bg-card border border-border rounded-xl p-1 shrink-0">
+          {SHOP_ROLES.map((r) => (
+            <button
+              key={r}
+              onClick={() => setRoleTab(r)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${
+                roleTab === r
+                  ? 'bg-primary text-foreground shadow-soft'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {r === 'all' ? 'All' : r}
+              <span className="ml-1.5 text-[10px] opacity-70">
+                {r === 'all'
+                  ? shopUsers.length
+                  : shopUsers.filter((u: ManagedUser) => u.role === r).length}
+              </span>
+            </button>
+          ))}
+        </div>
         <div className="relative flex-1">
           <Icon
             name="MagnifyingGlassIcon"
@@ -359,154 +426,116 @@ export default function CustomersClient() {
             className="w-full pl-9 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
           />
         </div>
-        <div className="flex items-center gap-1 bg-card border border-border rounded-xl p-1">
-          {(['all', 'active', 'inactive', 'suspended'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${
-                statusFilter === s
-                  ? 'bg-primary text-foreground shadow-soft'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as UserStatus | 'all')}
+          className="px-3 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground focus:outline-none focus:border-primary cursor-pointer shrink-0"
+        >
+          <option value="all">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="suspended">Suspended</option>
+        </select>
       </div>
 
-      {/* Table */}
-      <div className="bg-card border border-border rounded-2xl shadow-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left px-6 py-3.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Customer
-                </th>
-                <th className="text-left px-4 py-3.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden md:table-cell">
-                  Email
-                </th>
-                <th className="text-left px-4 py-3.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
-                  Joined
-                </th>
-                <th className="text-left px-4 py-3.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
-                  Last Active
-                </th>
-                <th className="text-center px-4 py-3.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Status
-                </th>
-                <th className="text-right px-6 py-3.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-16 text-sm text-muted-foreground">
-                    <Icon name="UsersIcon" size={32} className="mx-auto text-border mb-3" />
-                    No customers match your search.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((user: ManagedUser) => (
-                  <tr
-                    key={user.id}
-                    className="border-b border-border/50 hover:bg-secondary/30 transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-extrabold text-rose-deep">
-                            {user.firstName.charAt(0)}
-                            {user.lastName.charAt(0)}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-foreground">
-                            {user.firstName} {user.lastName}
-                          </p>
-                          <p className="text-xs text-muted-foreground md:hidden">{user.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 hidden md:table-cell">
-                      <span className="text-xs text-muted-foreground">{user.email}</span>
-                    </td>
-                    <td className="px-4 py-4 hidden lg:table-cell">
-                      <span className="text-xs text-muted-foreground">{user.joinedAt}</span>
-                    </td>
-                    <td className="px-4 py-4 hidden lg:table-cell">
-                      <span className="text-xs text-muted-foreground">{user.lastActive}</span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <select
-                        value={user.status}
-                        onChange={(e) => toggleStatus(user.id, e.target.value as UserStatus)}
-                        className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border cursor-pointer focus:outline-none transition-all ${STATUS_STYLES[user.status]}`}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="suspended">Suspended</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => setActivityUser(user)}
-                          title="View activity"
-                          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-secondary transition-all text-muted-foreground hover:text-foreground"
-                        >
-                          <Icon name="ClockIcon" size={15} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditTarget(user);
-                            setFormMode('edit');
-                          }}
-                          title="Edit"
-                          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-secondary transition-all text-muted-foreground hover:text-foreground"
-                        >
-                          <Icon name="PencilSquareIcon" size={15} />
-                        </button>
-                        <button
-                          onClick={() => setResetTarget(user)}
-                          title="Reset password"
-                          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-blue-50 transition-all text-muted-foreground hover:text-blue-600"
-                        >
-                          <Icon name="KeyIcon" size={15} />
-                        </button>
-                        <button
-                          onClick={() => setDeleteTarget(user)}
-                          title="Delete"
-                          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 transition-all text-muted-foreground hover:text-red-500"
-                        >
-                          <Icon name="TrashIcon" size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {/* User Cards Grid */}
+      {filtered.length === 0 ? (
+        <div className="bg-card border border-border rounded-2xl shadow-card flex flex-col items-center justify-center py-24 text-center">
+          <Icon name="UserGroupIcon" size={40} className="text-border mb-4" />
+          <p className="text-base font-bold text-foreground mb-1">No users found</p>
+          <p className="text-sm text-muted-foreground">Try adjusting filters or add a new user</p>
         </div>
-        <div className="px-6 py-3 border-t border-border">
-          <p className="text-xs text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{filtered.length}</span> of{' '}
-            <span className="font-semibold text-foreground">{users.length}</span> customers
-          </p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map((user: ManagedUser) => (
+            <div
+              key={user.id}
+              className="bg-card border border-border rounded-2xl shadow-card p-5 hover:shadow-rose transition-all duration-300 hover:-translate-y-0.5"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-primary/15 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-extrabold text-rose-deep">
+                      {user.firstName.charAt(0)}
+                      {user.lastName.charAt(0)}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">
+                      {user.firstName} {user.lastName}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[140px]">
+                      {user.email}
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg shrink-0 ${ROLE_STYLES[user.role]}`}
+                >
+                  {user.role}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 mb-4">
+                <select
+                  value={user.status}
+                  onChange={(e) => handleToggleStatus(user.id, e.target.value as UserStatus)}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border cursor-pointer focus:outline-none transition-all ${STATUS_STYLES[user.status]}`}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+                {user.phone && (
+                  <span className="text-[11px] text-muted-foreground truncate">{user.phone}</span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-4">
+                <span>Joined {user.joinedAt}</span>
+                <span>Active {user.lastActive}</span>
+              </div>
+
+              <div className="flex items-center gap-1.5 pt-4 border-t border-border">
+                <button
+                  onClick={() => setActivityUser(user)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
+                >
+                  <Icon name="ClockIcon" size={14} /> Activity
+                </button>
+                <button
+                  onClick={() => {
+                    setEditTarget(user);
+                    setFormMode('edit');
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
+                >
+                  <Icon name="PencilSquareIcon" size={14} /> Edit
+                </button>
+                <button
+                  onClick={() => setResetTarget(user)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-blue-50 hover:text-blue-600 transition-all"
+                >
+                  <Icon name="KeyIcon" size={14} /> Reset Pw
+                </button>
+                <button
+                  onClick={() => setDeleteTarget(user)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-all"
+                >
+                  <Icon name="TrashIcon" size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
       {/* Modals */}
       {formMode && (
         <UserFormModal
           mode={formMode}
           user={editTarget}
-          lockedRole="Customer"
+          shops={MOCK_SHOPS}
           onSave={handleSave}
           onClose={() => {
             setFormMode(null);
@@ -527,9 +556,9 @@ export default function CustomersClient() {
       {deleteTarget && (
         <ConfirmModal
           variant="danger"
-          title="Delete Customer"
-          message={`Are you sure you want to permanently delete ${deleteTarget.firstName} ${deleteTarget.lastName}? This cannot be undone.`}
-          confirmLabel="Delete Customer"
+          title="Remove User"
+          message={`Are you sure you want to remove ${deleteTarget.firstName} ${deleteTarget.lastName} from ${shop.name}?`}
+          confirmLabel="Remove User"
           onConfirm={handleDelete}
           onClose={() => setDeleteTarget(null)}
         />

@@ -1,15 +1,15 @@
 import React from 'react';
 import AdminSidebar from '@/components/features/dashboard/AdminSidebar';
-import ShopsClient from '@/components/features/shop/ShopsClient';
+import AdminProductsShopPicker from '@/components/features/admin/AdminProductsShopPicker';
 
-export const metadata = { title: 'All shops — BS Admin' };
+export const metadata = { title: 'Products by shop — BS Admin' };
 
-export default function AdminAllShopsPage() {
+export default function AdminProductsLandingPage() {
   return (
     <div className="flex min-h-screen bg-admin-bg">
       <AdminSidebar />
       <main className="flex-1 min-w-0 overflow-x-hidden">
-        <ShopsClient />
+        <AdminProductsShopPicker />
       </main>
     </div>
   );

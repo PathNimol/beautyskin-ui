@@ -41,14 +41,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   // Email/Password Sign Up
-  const signUp = async (email: string, password: string, metadata = {}) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    metadata: { fullName?: string; avatarUrl?: string } = {}
+  ) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          full_name: metadata?.fullName || '',
-          avatar_url: metadata?.avatarUrl || ''
+          full_name: metadata.fullName ?? '',
+          avatar_url: metadata.avatarUrl ?? '',
         },
         emailRedirectTo: `${window.location.origin}/auth/callback`
       }

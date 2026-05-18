@@ -20,43 +20,241 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   // Admin
-  { label: 'Dashboard', icon: 'Squares2X2Icon', href: '/admin/dashboard', roles: ['admin'], section: 'main' },
-  { label: 'All Shops', icon: 'BuildingStorefrontIcon', href: '/admin/all-shops', roles: ['admin'], section: 'admin' },
-  { label: 'Manage Shops', icon: 'WrenchScrewdriverIcon', href: '/admin/shops', roles: ['admin'], section: 'admin' },
-  { label: 'All Users', icon: 'UsersIcon', href: '/admin/customers', roles: ['admin'], section: 'admin' },
-  { label: 'Analytics', icon: 'ChartBarIcon', href: '/admin/analytics', roles: ['admin'], section: 'admin' },
-  { label: 'Platform Reports', icon: 'DocumentChartBarIcon', href: '/admin/reports', roles: ['admin'], section: 'admin' },
-  { label: 'Orders', icon: 'ClipboardDocumentListIcon', href: '/admin/orders', roles: ['admin'], section: 'admin' },
+  {
+    label: 'Dashboard',
+    icon: 'Squares2X2Icon',
+    href: '/admin/dashboard',
+    roles: ['admin'],
+    section: 'main',
+  },
+  {
+    label: 'All Shops',
+    icon: 'BuildingStorefrontIcon',
+    href: '/admin/all-shops',
+    roles: ['admin'],
+    section: 'admin',
+  },
+  {
+    label: 'Manage Shops',
+    icon: 'WrenchScrewdriverIcon',
+    href: '/admin/shops',
+    roles: ['admin'],
+    section: 'admin',
+  },
+  {
+    label: 'All Users',
+    icon: 'UsersIcon',
+    href: '/admin/customers',
+    roles: ['admin'],
+    section: 'admin',
+  },
+  {
+    label: 'Analytics',
+    icon: 'ChartBarIcon',
+    href: '/admin/analytics',
+    roles: ['admin'],
+    section: 'admin',
+  },
+  {
+    label: 'Platform Reports',
+    icon: 'DocumentChartBarIcon',
+    href: '/admin/reports',
+    roles: ['admin'],
+    section: 'admin',
+  },
+  {
+    label: 'Orders',
+    icon: 'ClipboardDocumentListIcon',
+    href: '/admin/orders',
+    roles: ['admin'],
+    section: 'admin',
+  },
   // Owner
-  { label: 'Dashboard', icon: 'Squares2X2Icon', href: '/owner/dashboard', roles: ['owner'], section: 'main' },
-  { label: 'Products', icon: 'ArchiveBoxIcon', href: '/owner/products', roles: ['owner'], section: 'shop' },
-  { label: 'Inventory', icon: 'CubeIcon', href: '/owner/inventory', roles: ['owner'], section: 'shop' },
-  { label: 'Orders', icon: 'ClipboardDocumentListIcon', href: '/owner/orders', roles: ['owner'], section: 'shop' },
-  { label: 'POS System', icon: 'ComputerDesktopIcon', href: '/owner/pos', roles: ['owner'], section: 'shop' },
-  { label: 'Staff', icon: 'UserGroupIcon', href: '/owner/staff', roles: ['owner'], section: 'management' },
-  { label: 'Suppliers', icon: 'TruckIcon', href: '/owner/suppliers', roles: ['owner'], section: 'management' },
-  { label: 'Purchases', icon: 'ShoppingCartIcon', href: '/owner/purchases', roles: ['owner'], section: 'management' },
-  { label: 'Customers', icon: 'HeartIcon', href: '/owner/customers', roles: ['owner'], section: 'management' },
-  { label: 'Promotions', icon: 'TagIcon', href: '/owner/promotions', roles: ['owner'], section: 'management' },
-  { label: 'Reports', icon: 'ChartBarIcon', href: '/owner/reports', roles: ['owner'], section: 'management' },
-  { label: 'Analytics', icon: 'PresentationChartLineIcon', href: '/owner/analytics', roles: ['owner'], section: 'management' },
+  {
+    label: 'Dashboard',
+    icon: 'Squares2X2Icon',
+    href: '/owner/dashboard',
+    roles: ['owner'],
+    section: 'main',
+  },
+  {
+    label: 'Products',
+    icon: 'ArchiveBoxIcon',
+    href: '/owner/products',
+    roles: ['owner'],
+    section: 'shop',
+  },
+  {
+    label: 'Inventory',
+    icon: 'CubeIcon',
+    href: '/owner/inventory',
+    roles: ['owner'],
+    section: 'shop',
+  },
+  {
+    label: 'Orders',
+    icon: 'ClipboardDocumentListIcon',
+    href: '/owner/orders',
+    roles: ['owner'],
+    section: 'shop',
+  },
+  {
+    label: 'POS System',
+    icon: 'ComputerDesktopIcon',
+    href: '/owner/pos',
+    roles: ['owner'],
+    section: 'shop',
+  },
+  {
+    label: 'Staff',
+    icon: 'UserGroupIcon',
+    href: '/owner/staff',
+    roles: ['owner'],
+    section: 'management',
+  },
+  {
+    label: 'Suppliers',
+    icon: 'TruckIcon',
+    href: '/owner/suppliers',
+    roles: ['owner'],
+    section: 'management',
+  },
+  {
+    label: 'Purchases',
+    icon: 'ShoppingCartIcon',
+    href: '/owner/purchases',
+    roles: ['owner'],
+    section: 'management',
+  },
+  {
+    label: 'Customers',
+    icon: 'HeartIcon',
+    href: '/owner/customers',
+    roles: ['owner'],
+    section: 'management',
+  },
+  {
+    label: 'Promotions',
+    icon: 'TagIcon',
+    href: '/owner/promotions',
+    roles: ['owner'],
+    section: 'management',
+  },
+  {
+    label: 'Reports',
+    icon: 'ChartBarIcon',
+    href: '/owner/reports',
+    roles: ['owner'],
+    section: 'management',
+  },
+  {
+    label: 'Analytics',
+    icon: 'PresentationChartLineIcon',
+    href: '/owner/analytics',
+    roles: ['owner'],
+    section: 'management',
+  },
   // Staff
-  { label: 'Dashboard', icon: 'Squares2X2Icon', href: '/staff/dashboard', roles: ['staff'], section: 'main' },
-  { label: 'Products', icon: 'ArchiveBoxIcon', href: '/staff/products', roles: ['staff'], section: 'shop' },
-  { label: 'Inventory', icon: 'CubeIcon', href: '/staff/inventory', roles: ['staff'], section: 'shop' },
-  { label: 'Orders', icon: 'ClipboardDocumentListIcon', href: '/staff/orders', roles: ['staff'], section: 'shop' },
-  { label: 'POS System', icon: 'ComputerDesktopIcon', href: '/staff/pos', roles: ['staff'], section: 'shop' },
-  { label: 'Revoke Requests', icon: 'ExclamationTriangleIcon', href: '/staff/revoke-requests', roles: ['staff'], section: 'staff' },
+  {
+    label: 'Dashboard',
+    icon: 'Squares2X2Icon',
+    href: '/staff/dashboard',
+    roles: ['staff'],
+    section: 'main',
+  },
+  {
+    label: 'Products',
+    icon: 'ArchiveBoxIcon',
+    href: '/staff/products',
+    roles: ['staff'],
+    section: 'shop',
+  },
+  {
+    label: 'Inventory',
+    icon: 'CubeIcon',
+    href: '/staff/inventory',
+    roles: ['staff'],
+    section: 'shop',
+  },
+  {
+    label: 'Orders',
+    icon: 'ClipboardDocumentListIcon',
+    href: '/staff/orders',
+    roles: ['staff'],
+    section: 'shop',
+  },
+  {
+    label: 'POS System',
+    icon: 'ComputerDesktopIcon',
+    href: '/staff/pos',
+    roles: ['staff'],
+    section: 'shop',
+  },
+  {
+    label: 'Revoke Requests',
+    icon: 'ExclamationTriangleIcon',
+    href: '/staff/revoke-requests',
+    roles: ['staff'],
+    section: 'staff',
+  },
   // Shared chat/DM for admin, owner, staff
-  { label: 'Chat', icon: 'ChatBubbleLeftRightIcon', href: '/chat', roles: ['admin', 'owner', 'staff'], section: 'shared' },
-  { label: 'Direct Messages', icon: 'EnvelopeIcon', href: '/direct-messages', roles: ['admin', 'owner', 'staff'], section: 'shared' },
-  { label: 'Settings', icon: 'Cog6ToothIcon', href: '/settings', roles: ['admin', 'owner', 'staff'], section: 'shared' },
+  {
+    label: 'Chat',
+    icon: 'ChatBubbleLeftRightIcon',
+    href: '/chat',
+    roles: ['admin', 'owner', 'staff'],
+    section: 'shared',
+  },
+  {
+    label: 'Direct Messages',
+    icon: 'EnvelopeIcon',
+    href: '/direct-messages',
+    roles: ['admin', 'owner', 'staff'],
+    section: 'shared',
+  },
+  {
+    label: 'Settings',
+    icon: 'Cog6ToothIcon',
+    href: '/settings',
+    roles: ['admin', 'owner', 'staff'],
+    section: 'shared',
+  },
   // Customer
-  { label: 'My Account', icon: 'UserCircleIcon', href: '/customer/account', roles: ['buyer'], section: 'customer' },
-  { label: 'Shop', icon: 'ShoppingBagIcon', href: '/customer/shop', roles: ['buyer'], section: 'customer' },
-  { label: 'Cart', icon: 'ShoppingCartIcon', href: '/customer/cart', roles: ['buyer'], section: 'customer' },
-  { label: 'Chat', icon: 'ChatBubbleLeftRightIcon', href: '/customer/chat', roles: ['buyer'], section: 'customer' },
-  { label: 'Direct Messages', icon: 'EnvelopeIcon', href: '/customer/direct-messages', roles: ['buyer'], section: 'customer' },
+  {
+    label: 'My Account',
+    icon: 'UserCircleIcon',
+    href: '/customer/account',
+    roles: ['buyer'],
+    section: 'customer',
+  },
+  {
+    label: 'Shop',
+    icon: 'ShoppingBagIcon',
+    href: '/customer/shop',
+    roles: ['buyer'],
+    section: 'customer',
+  },
+  {
+    label: 'Cart',
+    icon: 'ShoppingCartIcon',
+    href: '/customer/cart',
+    roles: ['buyer'],
+    section: 'customer',
+  },
+  {
+    label: 'Chat',
+    icon: 'ChatBubbleLeftRightIcon',
+    href: '/customer/chat',
+    roles: ['buyer'],
+    section: 'customer',
+  },
+  {
+    label: 'Direct Messages',
+    icon: 'EnvelopeIcon',
+    href: '/customer/direct-messages',
+    roles: ['buyer'],
+    section: 'customer',
+  },
 ];
 
 const ROLE_COLORS: Record<UserRole, string> = {
@@ -73,6 +271,10 @@ const ROLE_LABELS: Record<UserRole, string> = {
   buyer: 'Customer',
 };
 
+interface SidebarContentProps {
+  collapsed?: boolean;
+}
+
 export default function DashboardSidebar() {
   const { user, role, signOut } = useMockAuth();
   const pathname = usePathname();
@@ -80,26 +282,20 @@ export default function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const visibleItems = NAV_ITEMS.filter(item => role && item.roles.includes(role));
+  const visibleItems = NAV_ITEMS.filter((item) => role && item.roles.includes(role));
 
   const handleSignOut = () => {
     signOut();
-    router.push('/login');
+    router.push('/');
   };
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
-  const SidebarContent = () => (
+  const SidebarContent = ({ collapsed = false }: SidebarContentProps) => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className={`flex items-center gap-3 px-4 py-5 border-b border-border ${collapsed ? 'justify-center px-2' : ''}`}>
-        <AppLogo size={32} />
-        {!collapsed && (
-          <div>
-            <p className="font-bold text-sm text-foreground leading-none">BS Online Shop</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Beauty Skin Platform</p>
-          </div>
-        )}
+      <div className={`flex items-center justify-center px-3 py-3 border-b border-border`}>
+        <AppLogo size={collapsed ? 40 : 200} />
       </div>
 
       {/* Role badge */}
@@ -108,7 +304,13 @@ export default function DashboardSidebar() {
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-primary/30 shrink-0">
               {user?.avatar ? (
-                <AppImage src={user.avatar} alt={user.avatarAlt || 'User avatar'} width={32} height={32} className="object-cover w-full h-full" />
+                <AppImage
+                  src={user.avatar}
+                  alt={user.avatarAlt || 'User avatar'}
+                  width={32}
+                  height={32}
+                  className="object-cover w-full h-full"
+                />
               ) : (
                 <div className="w-full h-full bg-primary/20 flex items-center justify-center">
                   <Icon name="UserIcon" size={14} className="text-rose-deep" />
@@ -117,7 +319,9 @@ export default function DashboardSidebar() {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-bold text-foreground truncate">{user?.name}</p>
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${ROLE_COLORS[role]}`}>
+              <span
+                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${ROLE_COLORS[role]}`}
+              >
                 {ROLE_LABELS[role]}
               </span>
             </div>
@@ -140,15 +344,19 @@ export default function DashboardSidebar() {
                   : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
               } ${collapsed ? 'justify-center px-2' : ''}`}
             >
-              {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />}
+              {active && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
+              )}
               <Icon
                 name={item.icon as Parameters<typeof Icon>[0]['name']}
                 size={18}
-                className={active ? 'text-rose-deep' : 'text-muted-foreground group-hover:text-foreground transition-colors'}
+                className={
+                  active
+                    ? 'text-rose-deep'
+                    : 'text-muted-foreground group-hover:text-foreground transition-colors'
+                }
               />
-              {!collapsed && (
-                <span className="text-sm flex-1">{item.label}</span>
-              )}
+              {!collapsed && <span className="text-sm flex-1">{item.label}</span>}
               {!collapsed && item.badge && item.badge > 0 && (
                 <span className="w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
                   {item.badge}
@@ -189,12 +397,12 @@ export default function DashboardSidebar() {
       >
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-20 w-6 h-6 bg-card border border-border rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-all z-10 shadow-soft"
+          className="absolute -right-3 top-[83px] w-6 h-6 bg-card border border-border rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-all z-10 shadow-soft"
           aria-label="Toggle sidebar"
         >
           <Icon name={collapsed ? 'ChevronRightIcon' : 'ChevronLeftIcon'} size={12} />
         </button>
-        <SidebarContent />
+        <SidebarContent collapsed={collapsed} />
       </aside>
 
       {/* Mobile toggle */}
@@ -209,7 +417,10 @@ export default function DashboardSidebar() {
       {/* Mobile overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-[100] md:hidden">
-          <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div
+            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
           <aside className="absolute left-0 top-0 bottom-0 w-60 bg-card flex flex-col shadow-xl">
             <button
               onClick={() => setMobileOpen(false)}
