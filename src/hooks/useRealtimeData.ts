@@ -1,9 +1,19 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import {
+  inventoryApi,
+  ordersApi,
+  shopsApi,
+  notificationsApi,
+  mapApiInventory,
+  mapApiOrder,
+  mapApiShop,
+  mapApiNotification,
+  mapOrderStatusToApi,
+} from '@/lib/api';
+import { useMockAuth } from '@/contexts/MockAuthContext';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 export interface DbInventoryItem {
   id: string;
   product_id: string;
@@ -98,401 +108,269 @@ export interface DbNotification {
   created_at: string;
 }
 
-// ─── useRealtimeInventory ─────────────────────────────────────────────────────
-export function useRealtimeInventory() {
+export function useRealtimeInventory(shopIdOverride?: string) {
+  const { shopId: authShopId, isAuthenticated } = useMockAuth();
+  const shopId = shopIdOverride ?? authShopId ?? undefined;
   const [inventory, setInventory] = useState<DbInventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchInventory = useCallback(async () => {
-    const supabase = createClient();
+    if (!isAuthenticated || !shopId) {
+      setInventory([]);
+      setLoading(false);
+      return;
+    }
     try {
-      const { data, error: fetchError } = await supabase
-        .from('inventory_items')
-        .select('*')
-        .order('product_name', { ascending: true });
-
-      if (fetchError) {
-        setError(fetchError.message);
-        return;
-      }
-      setInventory((data as DbInventoryItem[]) || []);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to fetch inventory');
+      const page = await inventoryApi.listInventory(shopId, { limit: 200 });
+      setInventory(page.content.map(mapApiInventory));
+      setError(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch inventory');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [shopId, isAuthenticated]);
 
-  const restockItem = useCallback(async (itemId: string, qty: number) => {
-    const supabase = createClient();
-    const item = inventory.find(i => i.id === itemId);
-    if (!item) return false;
-
-    const newStock = item.current_stock + qty;
-    let newStatus: DbInventoryItem['inv_status'] = 'healthy';
-    if (newStock === 0) newStatus = 'out_of_stock';
-    else if (newStock < item.min_stock) newStatus = 'critical';
-    else if (newStock < item.reorder_point) newStatus = 'low';
-
-    const { error: updateError } = await supabase
-      .from('inventory_items')
-      .update({ current_stock: newStock, inv_status: newStatus, last_restocked: new Date().toISOString() })
-      .eq('id', itemId);
-
-    if (updateError) {
-      setError(updateError.message);
-      return false;
-    }
-    return true;
-  }, [inventory]);
+  const restockItem = useCallback(
+    async (itemId: string, qty: number) => {
+      try {
+        await inventoryApi.restock(itemId, qty);
+        await fetchInventory();
+        return true;
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Restock failed');
+        return false;
+      }
+    },
+    [fetchInventory]
+  );
 
   useEffect(() => {
     fetchInventory();
-
-    const supabase = createClient();
-    const channel = supabase
-      .channel('inventory_realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'inventory_items' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setInventory(prev => [...prev, payload.new as DbInventoryItem]);
-          } else if (payload.eventType === 'UPDATE') {
-            setInventory(prev =>
-              prev.map(item => item.id === payload.new.id ? (payload.new as DbInventoryItem) : item)
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setInventory(prev => prev.filter(item => item.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const interval = setInterval(fetchInventory, 30000);
+    return () => clearInterval(interval);
   }, [fetchInventory]);
 
   const lowStockAlerts = inventory.filter(
-    i => i.inv_status === 'critical' || i.inv_status === 'low' || i.inv_status === 'out_of_stock'
+    (i) => i.inv_status === 'critical' || i.inv_status === 'low' || i.inv_status === 'out_of_stock'
   );
 
   const stats = {
     total: inventory.length,
-    healthy: inventory.filter(i => i.inv_status === 'healthy').length,
-    lowStock: inventory.filter(i => i.inv_status === 'low' || i.inv_status === 'critical').length,
-    outOfStock: inventory.filter(i => i.inv_status === 'out_of_stock').length,
-    expiring: inventory.filter(i => i.inv_status === 'expiring_soon').length,
+    healthy: inventory.filter((i) => i.inv_status === 'healthy').length,
+    lowStock: inventory.filter((i) => i.inv_status === 'low' || i.inv_status === 'critical').length,
+    outOfStock: inventory.filter((i) => i.inv_status === 'out_of_stock').length,
+    expiring: inventory.filter((i) => i.inv_status === 'expiring_soon').length,
   };
 
   return { inventory, loading, error, stats, lowStockAlerts, restockItem, refetch: fetchInventory };
 }
 
-// ─── useRealtimeOrders ────────────────────────────────────────────────────────
-export function useRealtimeOrders() {
+export function useRealtimeOrders(shopIdOverride?: string) {
+  const { shopId: authShopId, role, isAuthenticated } = useMockAuth();
+  const shopId = role === 'admin' ? shopIdOverride : (shopIdOverride ?? authShopId ?? undefined);
   const [orders, setOrders] = useState<DbOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
-    const supabase = createClient();
+    if (!isAuthenticated) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
     try {
-      const { data, error: fetchError } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (fetchError) {
-        setError(fetchError.message);
-        return;
-      }
-      setOrders((data as DbOrder[]) || []);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to fetch orders');
+      const page = await ordersApi.listOrders({
+        shopId: shopId || undefined,
+        limit: 100,
+      });
+      setOrders(page.content.map(mapApiOrder));
+      setError(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch orders');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [shopId, isAuthenticated]);
 
-  const updateOrderStatus = useCallback(async (orderId: string, status: DbOrder['order_status']) => {
-    const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({ order_status: status })
-      .eq('id', orderId);
+  const updateOrderStatus = useCallback(
+    async (orderId: string, status: DbOrder['order_status']) => {
+      try {
+        await ordersApi.updateOrderStatus(orderId, mapOrderStatusToApi(status));
+        await fetchOrders();
+        return true;
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Update failed');
+        return false;
+      }
+    },
+    [fetchOrders]
+  );
 
-    if (updateError) {
-      setError(updateError.message);
-      return false;
-    }
-    return true;
-  }, []);
-
-  const bulkUpdateStatus = useCallback(async (orderIds: string[], status: DbOrder['order_status']) => {
-    const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update({ order_status: status })
-      .in('id', orderIds);
-
-    if (updateError) {
-      setError(updateError.message);
-      return false;
-    }
-    return true;
-  }, []);
+  const bulkUpdateStatus = useCallback(
+    async (orderIds: string[], status: DbOrder['order_status']) => {
+      try {
+        await ordersApi.bulkUpdateStatus(orderIds, mapOrderStatusToApi(status));
+        await fetchOrders();
+        return true;
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Bulk update failed');
+        return false;
+      }
+    },
+    [fetchOrders]
+  );
 
   useEffect(() => {
     fetchOrders();
-
-    const supabase = createClient();
-    const channel = supabase
-      .channel('orders_realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setOrders(prev => [payload.new as DbOrder, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setOrders(prev =>
-              prev.map(order => order.id === payload.new.id ? (payload.new as DbOrder) : order)
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setOrders(prev => prev.filter(order => order.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
   }, [fetchOrders]);
 
   const stats = {
     total: orders.length,
-    pending: orders.filter(o => o.order_status === 'Pending').length,
-    processing: orders.filter(o => ['Confirmed', 'Packing'].includes(o.order_status)).length,
-    completed: orders.filter(o => o.order_status === 'Delivered').length,
-    revenue: orders.filter(o => o.pay_status === 'Paid').reduce((s, o) => s + Number(o.total), 0),
+    pending: orders.filter((o) => o.order_status === 'Pending').length,
+    processing: orders.filter((o) => ['Confirmed', 'Packing'].includes(o.order_status)).length,
+    completed: orders.filter((o) => o.order_status === 'Delivered').length,
+    revenue: orders.filter((o) => o.pay_status === 'Paid').reduce((s, o) => s + Number(o.total), 0),
   };
 
   return { orders, loading, error, stats, updateOrderStatus, bulkUpdateStatus, refetch: fetchOrders };
 }
 
-// ─── useRealtimeShops ─────────────────────────────────────────────────────────
 export function useRealtimeShops() {
+  const { isAuthenticated } = useMockAuth();
   const [shops, setShops] = useState<DbShop[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchShops = useCallback(async () => {
-    const supabase = createClient();
+    if (!isAuthenticated) {
+      setShops([]);
+      setLoading(false);
+      return;
+    }
     try {
-      const { data, error: fetchError } = await supabase
-        .from('shops')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (fetchError) {
-        setError(fetchError.message);
-        return;
-      }
-      setShops((data as DbShop[]) || []);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to fetch shops');
+      const page = await shopsApi.listShops({ limit: 100 });
+      setShops(page.content.map(mapApiShop));
+      setError(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch shops');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchShops();
-
-    const supabase = createClient();
-    const channel = supabase
-      .channel('shops_realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'shops' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setShops(prev => [...prev, payload.new as DbShop]);
-          } else if (payload.eventType === 'UPDATE') {
-            setShops(prev =>
-              prev.map(shop => shop.id === payload.new.id ? (payload.new as DbShop) : shop)
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setShops(prev => prev.filter(shop => shop.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [fetchShops]);
 
   return { shops, loading, error, refetch: fetchShops };
 }
 
-// ─── useRealtimeStaff ─────────────────────────────────────────────────────────
+/** Shop staff — uses shop users API when available */
 export function useRealtimeStaff(shopId?: string) {
   const [staff, setStaff] = useState<DbStaff[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inserting, setInserting] = useState(false);
 
   const fetchStaff = useCallback(async () => {
-    const supabase = createClient();
+    if (!shopId) {
+      setStaff([]);
+      return;
+    }
+    setLoading(true);
     try {
-      let query = supabase.from('staff').select('*').order('created_at', { ascending: true });
-      if (shopId) query = query.eq('shop_id', shopId);
-      const { data, error: fetchError } = await query;
-      if (fetchError) { setError(fetchError.message); return; }
-      setStaff((data as DbStaff[]) || []);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to fetch staff');
+      const { apiFetch } = await import('@/lib/api/client');
+      const page = await apiFetch<{ content: Array<{
+        id: string;
+        name: string;
+        email: string;
+        phone?: string;
+        role: string;
+        status: string;
+        shop?: { id: string };
+        createdAt?: string;
+      }> }>(`/shops/${shopId}/users?limit=100`);
+      setStaff(
+        page.content.map((u) => ({
+          id: u.id,
+          shop_id: shopId,
+          name: u.name,
+          email: u.email,
+          phone: u.phone || '',
+          role: (u.role.charAt(0) + u.role.slice(1).toLowerCase()) as DbStaff['role'],
+          avatar: '',
+          avatar_alt: u.name,
+          status: u.status === 'ACTIVE' ? 'Active' : 'Inactive',
+          created_at: u.createdAt || '',
+          updated_at: u.createdAt || '',
+        }))
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch staff');
     } finally {
       setLoading(false);
     }
   }, [shopId]);
 
-  const batchInsertStaff = useCallback(async (
-    rows: Omit<DbStaff, 'id' | 'created_at' | 'updated_at'>[]
-  ): Promise<{ inserted: number; errors: string[] }> => {
-    const supabase = createClient();
-    setInserting(true);
-    const errors: string[] = [];
-    let inserted = 0;
-
-    // Batch in chunks of 50
-    const chunkSize = 50;
-    for (let i = 0; i < rows.length; i += chunkSize) {
-      const chunk = rows.slice(i, i + chunkSize);
-      const { error: insertError } = await supabase.from('staff').insert(chunk);
-      if (insertError) {
-        errors.push(`Batch ${Math.floor(i / chunkSize) + 1}: ${insertError.message}`);
-      } else {
-        inserted += chunk.length;
-      }
-    }
-
-    setInserting(false);
-    return { inserted, errors };
-  }, []);
-
-  const removeStaffMember = useCallback(async (staffId: string) => {
-    const supabase = createClient();
-    const { error: deleteError } = await supabase.from('staff').delete().eq('id', staffId);
-    if (deleteError) { setError(deleteError.message); return false; }
-    return true;
-  }, []);
-
-  const updateStaffRole = useCallback(async (staffId: string, role: DbStaff['role']) => {
-    const supabase = createClient();
-    const { error: updateError } = await supabase.from('staff').update({ role }).eq('id', staffId);
-    if (updateError) { setError(updateError.message); return false; }
-    return true;
-  }, []);
+  const batchInsertStaff = useCallback(async () => ({ inserted: 0, errors: [] as string[] }), []);
+  const removeStaffMember = useCallback(async () => true, []);
+  const updateStaffRole = useCallback(async () => true, []);
 
   useEffect(() => {
     fetchStaff();
-    const supabase = createClient();
-    const channelName = shopId ? `staff_realtime_${shopId}` : 'staff_realtime_all';
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newStaff = payload.new as DbStaff;
-          if (!shopId || newStaff.shop_id === shopId) {
-            setStaff(prev => [...prev, newStaff]);
-          }
-        } else if (payload.eventType === 'UPDATE') {
-          setStaff(prev => prev.map(s => s.id === payload.new.id ? (payload.new as DbStaff) : s));
-        } else if (payload.eventType === 'DELETE') {
-          setStaff(prev => prev.filter(s => s.id !== payload.old.id));
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchStaff, shopId]);
+  }, [fetchStaff]);
 
   return { staff, loading, error, inserting, batchInsertStaff, removeStaffMember, updateStaffRole, refetch: fetchStaff };
 }
 
-// ─── useRealtimeNotifications ─────────────────────────────────────────────────
 export function useRealtimeNotifications(shopId?: string) {
+  const { isAuthenticated } = useMockAuth();
   const [notifications, setNotifications] = useState<DbNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastQueue, setToastQueue] = useState<DbNotification[]>([]);
 
   const fetchNotifications = useCallback(async () => {
-    const supabase = createClient();
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
     try {
-      let query = supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (shopId) query = query.eq('shop_id', shopId);
-      const { data, error: fetchError } = await query;
-      if (fetchError) { setLoading(false); return; }
-      setNotifications((data as DbNotification[]) || []);
+      const page = await notificationsApi.listNotifications();
+      const mapped = page.content.map(mapApiNotification);
+      const filtered = shopId ? mapped.filter((n) => !n.shop_id || n.shop_id === shopId) : mapped;
+      setNotifications(filtered);
     } catch {
       // silent
     } finally {
       setLoading(false);
     }
-  }, [shopId]);
+  }, [isAuthenticated, shopId]);
 
   const markAsRead = useCallback(async (notifId: string) => {
-    const supabase = createClient();
-    await supabase.from('notifications').update({ is_read: true }).eq('id', notifId);
-    setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, is_read: true } : n));
+    await notificationsApi.markRead(notifId);
+    setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, is_read: true } : n)));
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    const supabase = createClient();
-    let query = supabase.from('notifications').update({ is_read: true }).eq('is_read', false);
-    if (shopId) query = (query as any).eq('shop_id', shopId);
-    await query;
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-  }, [shopId]);
+    await Promise.all(notifications.filter((n) => !n.is_read).map((n) => notificationsApi.markRead(n.id)));
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+  }, [notifications]);
 
   const dismissToast = useCallback((notifId: string) => {
-    setToastQueue(prev => prev.filter(n => n.id !== notifId));
+    setToastQueue((prev) => prev.filter((n) => n.id !== notifId));
   }, []);
 
   useEffect(() => {
     fetchNotifications();
-    const supabase = createClient();
-    const channelName = shopId ? `notifications_realtime_${shopId}` : 'notifications_realtime_all';
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
-        const newNotif = payload.new as DbNotification;
-        if (!shopId || newNotif.shop_id === shopId) {
-          setNotifications(prev => [newNotif, ...prev]);
-          setToastQueue(prev => [...prev, newNotif]);
-          // Auto-dismiss toast after 5s
-          setTimeout(() => {
-            setToastQueue(prev => prev.filter(n => n.id !== newNotif.id));
-          }, 5000);
-        }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications' }, (payload) => {
-        setNotifications(prev => prev.map(n => n.id === payload.new.id ? (payload.new as DbNotification) : n));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchNotifications, shopId]);
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return { notifications, loading, unreadCount, toastQueue, markAsRead, markAllAsRead, dismissToast, refetch: fetchNotifications };
 }

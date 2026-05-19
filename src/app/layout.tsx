@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import '../styles/tailwind.css';
 import { MockAuthProvider } from '@/contexts/MockAuthContext';
+import { CartProvider } from '@/contexts/CartContext';
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -35,7 +36,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={plusJakartaSans.variable}>
       <body className={plusJakartaSans.className}>
-        <MockAuthProvider>{children}</MockAuthProvider>
+        <MockAuthProvider>
+          <CartProvider>{children}</CartProvider>
+        </MockAuthProvider>
       </body>
     </html>
   );

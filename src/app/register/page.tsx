@@ -1,15 +1,21 @@
 'use client';
-import React, { useState, useRef } from 'react';
+
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
+import OtpVerification from '@/components/auth/OtpVerification';
+import SocialAuthButtons, { type OAuthProvider } from '@/components/auth/SocialAuthButtons';
+import { useMockAuth } from '@/contexts/MockAuthContext';
+import { generateOtp } from '@/lib/mock/authStore';
+import { getRoleHomePath } from '@/lib/auth/redirects';
 
 const ROLES = [
   {
-    value: 'Buyer',
-    label: 'Buyer',
-    desc: 'Shop skincare products',
+    value: 'Customer',
+    label: 'Customer',
+    desc: 'Shop from all stores',
     icon: 'ShoppingBagIcon',
     color: 'border-green-300 bg-green-50 text-green-700',
   },
@@ -36,142 +42,30 @@ const ROLES = [
   },
 ];
 
-// ── OTP Step (Step 3) ─────────────────────────────────────────────────────────
-function OtpStep({ email, onVerified }: { email: string; onVerified: () => void }) {
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [verified, setVerified] = useState(false);
-  const refs = Array.from({ length: 6 }, () => useRef<HTMLInputElement>(null));
-
-  const handleChange = (i: number, val: string) => {
-    if (!/^\d*$/.test(val)) return;
-    const next = [...otp];
-    next[i] = val.slice(-1);
-    setOtp(next);
-    if (val && i < 5) refs[i + 1].current?.focus();
-  };
-
-  const handleKeyDown = (i: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otp[i] && i > 0) refs[i - 1].current?.focus();
-  };
-
-  const handleVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    const code = otp.join('');
-    if (code.length < 6) {
-      setError('Please enter all 6 digits.');
-      return;
-    }
-    setError('');
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      if (code === '123456') {
-        setVerified(true);
-        // After brief success display, bubble up so parent can redirect to /login
-        setTimeout(onVerified, 2200);
-      } else {
-        setError('Invalid OTP. Use 123456 for demo.');
-        setOtp(['', '', '', '', '', '']);
-        refs[0].current?.focus();
-      }
-    }, 900);
-  };
-
-  if (verified) {
-    return (
-      <div className="text-center py-8">
-        <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Icon name="CheckCircleIcon" size={40} className="text-green-600" />
-        </div>
-        <h3 className="text-2xl font-extrabold text-foreground mb-2">Account verified!</h3>
-        <p className="text-muted-foreground text-sm mb-1">
-          Your account has been successfully created and verified.
-        </p>
-        <p className="text-sm font-semibold text-accent">Redirecting you to login…</p>
-        <div className="mt-6 flex justify-center">
-          <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleVerify}>
-      <div className="w-14 h-14 bg-primary/20 rounded-2xl flex items-center justify-center mb-6">
-        <Icon name="DevicePhoneMobileIcon" size={26} className="text-rose-deep" />
-      </div>
-      <h2 className="text-2xl font-extrabold text-foreground mb-2">Verify your email</h2>
-      <p className="text-muted-foreground text-sm mb-1">We&apos;ve sent a 6-digit code to</p>
-      <p className="text-sm font-semibold text-foreground mb-6">{email}</p>
-
-      {error && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl mb-5">
-          <Icon name="ExclamationCircleIcon" size={16} className="text-red-500 shrink-0" />
-          <p className="text-xs text-red-700">{error}</p>
-        </div>
-      )}
-
-      <div className="flex gap-2 justify-between mb-6">
-        {otp.map((digit, i) => (
-          <input
-            key={i}
-            ref={refs[i]}
-            type="text"
-            inputMode="numeric"
-            maxLength={1}
-            value={digit}
-            onChange={(e) => handleChange(i, e.target.value)}
-            onKeyDown={(e) => handleKeyDown(i, e)}
-            className="w-11 h-12 text-center text-lg font-bold bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-          />
-        ))}
-      </div>
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full py-3.5 bg-primary text-foreground font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose disabled:opacity-60 flex items-center justify-center gap-2 min-h-[48px]"
-      >
-        {loading ? (
-          <>
-            <div className="w-4 h-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
-            Verifying...
-          </>
-        ) : (
-          'Verify & Create Account'
-        )}
-      </button>
-
-      <p className="text-center text-xs text-muted-foreground mt-4">
-        Demo hint: use <span className="font-mono font-semibold text-foreground">123456</span>
-      </p>
-    </form>
-  );
-}
-
-// ── Register Page ─────────────────────────────────────────────────────────────
 export default function RegisterPage() {
   const router = useRouter();
+  const { register, signIn, signInWithOAuth } = useMockAuth();
   const [step, setStep] = useState(1);
-  const [selectedRole, setSelectedRole] = useState('Buyer');
+  const [selectedRole, setSelectedRole] = useState('Customer');
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
     email: '',
+    phone: '',
     password: '',
     confirmPassword: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [registerError, setRegisterError] = useState('');
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.firstName.trim()) e.firstName = 'First name is required';
     if (!form.lastName.trim()) e.lastName = 'Last name is required';
     if (!form.email.includes('@')) e.email = 'Valid email is required';
+    if (!form.phone.trim()) e.phone = 'Phone number is required';
     if (form.password.length < 6) e.password = 'Password must be at least 6 characters';
     if (form.password !== form.confirmPassword) e.confirmPassword = 'Passwords do not match';
     setErrors(e);
@@ -181,233 +75,353 @@ export default function RegisterPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    setRegisterError('');
     setLoading(true);
-    // Simulate account creation, then move to OTP step
     setTimeout(() => {
+      generateOtp(form.email);
       setLoading(false);
       setStep(3);
-    }, 800);
+    }, 500);
   };
 
-  // After OTP verified → back to login (not auto-signed in, for safety)
-  const handleOtpVerified = () => {
-    router.push('/login');
+  const handleOtpVerified = async () => {
+    try {
+      await register({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        phone: form.phone,
+        password: form.password,
+        uiRole: selectedRole,
+      });
+      await signIn(form.email, form.password);
+      router.push(
+        getRoleHomePath(selectedRole === 'Customer' ? 'customer' : selectedRole.toLowerCase())
+      );
+    } catch (err) {
+      setRegisterError(err instanceof Error ? err.message : 'Registration failed');
+      setStep(2);
+    }
   };
 
-  const totalSteps = 3;
+  const handleOAuth = async (provider: OAuthProvider) => {
+    try {
+      await signInWithOAuth(provider);
+      router.push('/customer/products');
+    } catch {
+      setRegisterError(`Could not sign up with ${provider}.`);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-lg">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <Link href="/">
-            <AppLogo size={40} />
-          </Link>
+        <Link href="/" className="flex items-center gap-3 mb-8">
+          <AppLogo size={40} />
           <div>
             <p className="font-bold text-lg text-foreground">BS Online Shop</p>
             <p className="text-xs text-muted-foreground">Create your account</p>
           </div>
+        </Link>
+
+        <MotionRegisterCard
+          step={step}
+          registerError={registerError}
+          selectedRole={selectedRole}
+          setSelectedRole={setSelectedRole}
+          setStep={setStep}
+          form={form}
+          setForm={setForm}
+          errors={errors}
+          showPassword={showPassword}
+          setShowPassword={setShowPassword}
+          loading={loading}
+          handleSubmit={handleSubmit}
+          handleOtpVerified={handleOtpVerified}
+          handleOAuth={handleOAuth}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MotionRegisterCard(props: {
+  step: number;
+  registerError: string;
+  selectedRole: string;
+  setSelectedRole: (r: string) => void;
+  setStep: (s: number) => void;
+  form: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    password: string;
+    confirmPassword: string;
+  };
+  setForm: React.Dispatch<
+    React.SetStateAction<{
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+      password: string;
+      confirmPassword: string;
+    }>
+  >;
+  errors: Record<string, string>;
+  showPassword: boolean;
+  setShowPassword: (v: boolean) => void;
+  loading: boolean;
+  handleSubmit: (e: React.FormEvent) => void;
+  handleOtpVerified: () => void;
+  handleOAuth: (p: OAuthProvider) => Promise<void>;
+}) {
+  const {
+    step,
+    registerError,
+    selectedRole,
+    setSelectedRole,
+    setStep,
+    form,
+    setForm,
+    errors,
+    showPassword,
+    setShowPassword,
+    loading,
+    handleSubmit,
+    handleOtpVerified,
+    handleOAuth,
+  } = props;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl shadow-card p-8">
+      <StepIndicator step={step} />
+
+      {registerError && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl mb-5">
+          <Icon name="ExclamationCircleIcon" size={16} className="text-red-500" />
+          <p className="text-xs text-red-700">{registerError}</p>
         </div>
+      )}
 
-        <div className="bg-card border border-border rounded-2xl shadow-card p-8">
-          {/* Step indicator */}
-          <div className="flex items-center gap-3 mb-8">
-            {[1, 2, 3].map((s) => (
-              <React.Fragment key={s}>
-                <div
-                  className={`flex items-center gap-2 ${step >= s ? 'text-foreground' : 'text-muted-foreground'}`}
-                >
-                  <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step > s ? 'bg-green-500 text-white' : step === s ? 'bg-primary text-foreground' : 'bg-secondary text-muted-foreground'}`}
-                  >
-                    {step > s ? <Icon name="CheckIcon" size={14} /> : s}
-                  </div>
-                  <span className="text-sm font-medium hidden sm:block">
-                    {s === 1 ? 'Choose Role' : s === 2 ? 'Your Details' : 'Verify Email'}
-                  </span>
-                </div>
-                {s < totalSteps && (
-                  <div
-                    className={`flex-1 h-0.5 rounded-full transition-all ${step > s ? 'bg-green-500' : 'bg-border'}`}
-                  />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
+      {step === 1 && (
+        <RoleStep
+          selectedRole={selectedRole}
+          setSelectedRole={setSelectedRole}
+          onNext={() => setStep(2)}
+        />
+      )}
 
-          {/* Step 1 — Role Selection */}
-          {step === 1 && (
-            <div>
-              <h2 className="text-2xl font-extrabold text-foreground mb-2">Select your role</h2>
-              <p className="text-muted-foreground text-sm mb-6">
-                Choose the role that best describes how you&apos;ll use BS Online Shop
-              </p>
-              <div className="grid grid-cols-2 gap-3 mb-8">
-                {ROLES.map((role) => (
-                  <button
-                    key={role.value}
-                    onClick={() => setSelectedRole(role.value)}
-                    className={`p-4 rounded-xl border-2 text-left transition-all hover:shadow-soft ${selectedRole === role.value ? role.color + ' border-2' : 'border-border bg-secondary/30 hover:bg-secondary'}`}
-                  >
-                    <Icon
-                      name={role.icon as Parameters<typeof Icon>[0]['name']}
-                      size={22}
-                      className="mb-2"
-                    />
-                    <p className="font-bold text-sm">{role.label}</p>
-                    <p className="text-xs opacity-70 mt-0.5">{role.desc}</p>
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => setStep(2)}
-                className="w-full py-3.5 bg-primary text-foreground font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose min-h-[48px]"
-              >
-                Continue as {selectedRole}
-              </button>
+      {step === 2 && (
+        <>
+          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="flex items-center gap-2 text-muted-foreground mb-2"
+            >
+              <Icon name="ArrowLeftIcon" size={18} />
+              <span className="text-sm">Back</span>
+            </button>
+            <h2 className="text-2xl font-extrabold text-foreground">Your details</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Registering as <span className="font-semibold text-accent">{selectedRole}</span>
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="First Name"
+                value={form.firstName}
+                onChange={(v) => setForm({ ...form, firstName: v })}
+                error={errors.firstName}
+              />
+              <Input
+                label="Last Name"
+                value={form.lastName}
+                onChange={(v) => setForm({ ...form, lastName: v })}
+                error={errors.lastName}
+              />
             </div>
-          )}
-
-          {/* Step 2 — Personal Details */}
-          {step === 2 && (
-            <form onSubmit={handleSubmit}>
-              <div className="flex items-center gap-2 mb-6">
+            <Input
+              label="Email"
+              type="email"
+              value={form.email}
+              onChange={(v) => setForm({ ...form, email: v })}
+              error={errors.email}
+            />
+            <Input
+              label="Phone number"
+              type="tel"
+              value={form.phone}
+              onChange={(v) => setForm({ ...form, phone: v })}
+              error={errors.phone}
+              placeholder="+855 12 345 678"
+            />
+            <div>
+              <label className="block text-sm font-semibold mb-1.5">Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  className="w-full px-4 py-3 pr-12 bg-background border border-border rounded-xl text-sm"
+                />
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2"
                 >
-                  <Icon name="ArrowLeftIcon" size={18} />
+                  <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={18} />
                 </button>
-                <div>
-                  <h2 className="text-2xl font-extrabold text-foreground">Your details</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Registering as <span className="font-semibold text-accent">{selectedRole}</span>
-                  </p>
-                </div>
               </div>
+              {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+            </div>
+            <Input
+              label="Confirm Password"
+              type="password"
+              value={form.confirmPassword}
+              onChange={(v) => setForm({ ...form, confirmPassword: v })}
+              error={errors.confirmPassword}
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 bg-primary font-bold rounded-xl disabled:opacity-60 min-h-[48px]"
+            >
+              {loading ? 'Sending OTP…' : 'Continue to verification'}
+            </button>
+          </form>
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-1.5">
-                      First Name
-                    </label>
-                    <input
-                      type="text"
-                      value={form.firstName}
-                      onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                      placeholder="Emma"
-                      className="w-full px-4 py-3 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                    {errors.firstName && (
-                      <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-1.5">
-                      Last Name
-                    </label>
-                    <input
-                      type="text"
-                      value={form.lastName}
-                      onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                      placeholder="Rodriguez"
-                      className="w-full px-4 py-3 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                    {errors.lastName && (
-                      <p className="text-xs text-red-500 mt-1">{errors.lastName}</p>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-foreground mb-1.5">
-                    Email address
-                  </label>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    placeholder="you@example.com"
-                    className="w-full px-4 py-3 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                  />
-                  {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-foreground mb-1.5">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      placeholder="At least 6 characters"
-                      className="w-full px-4 py-3 pr-12 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={18} />
-                    </button>
-                  </div>
-                  {errors.password && (
-                    <p className="text-xs text-red-500 mt-1">{errors.password}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-foreground mb-1.5">
-                    Confirm Password
-                  </label>
-                  <input
-                    type="password"
-                    value={form.confirmPassword}
-                    onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                    placeholder="Repeat your password"
-                    className="w-full px-4 py-3 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                  />
-                  {errors.confirmPassword && (
-                    <p className="text-xs text-red-500 mt-1">{errors.confirmPassword}</p>
-                  )}
-                </div>
-              </div>
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-3 text-muted-foreground font-medium">
+                or continue with social account
+              </span>
+            </div>
+          </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full mt-6 py-3.5 bg-primary text-foreground font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose disabled:opacity-60 flex items-center justify-center gap-2 min-h-[48px]"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
-                    Creating account...
-                  </>
-                ) : (
-                  'Continue'
-                )}
-              </button>
-            </form>
-          )}
+          <SocialAuthButtons onProvider={handleOAuth} disabled={loading} />
+        </>
+      )}
 
-          {/* Step 3 — OTP Verification */}
-          {step === 3 && <OtpStep email={form.email} onVerified={handleOtpVerified} />}
+      {step === 3 && (
+        <OtpVerification
+          email={form.email}
+          onVerified={handleOtpVerified}
+          submitLabel="Verify & Create Account"
+        />
+      )}
 
-          {step < 3 && (
-            <p className="text-center text-sm text-muted-foreground mt-6">
-              Already have an account?{' '}
-              <Link
-                href="/login"
-                className="text-accent hover:text-gold-deep font-semibold transition-colors"
-              >
-                Sign in
-              </Link>
-            </p>
-          )}
-        </div>
+      {step < 3 && (
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          Already have an account?{' '}
+          <Link href="/login" className="text-accent font-semibold">
+            Sign in
+          </Link>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function StepIndicator({ step }: { step: number }) {
+  return (
+    <div className="flex items-center gap-3 mb-8">
+      {[1, 2, 3].map((s) => (
+        <React.Fragment key={s}>
+          <div
+            className={`flex items-center gap-2 ${step >= s ? 'text-foreground' : 'text-muted-foreground'}`}
+          >
+            <div
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${step > s ? 'bg-green-500 text-white' : step === s ? 'bg-primary' : 'bg-secondary'}`}
+            >
+              {step > s ? <Icon name="CheckIcon" size={14} /> : s}
+            </div>
+            <span className="text-sm hidden sm:block">
+              {s === 1 ? 'Role' : s === 2 ? 'Details' : 'OTP'}
+            </span>
+          </div>
+          {s < 3 && <MotionStepLine step={step} s={s} />}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+function MotionStepLine({ step, s }: { step: number; s: number }) {
+  return <div className={`flex-1 h-0.5 rounded-full ${step > s ? 'bg-green-500' : 'bg-border'}`} />;
+}
+
+function RoleStep({
+  selectedRole,
+  setSelectedRole,
+  onNext,
+}: {
+  selectedRole: string;
+  setSelectedRole: (r: string) => void;
+  onNext: () => void;
+}) {
+  return (
+    <div>
+      <h2 className="text-2xl font-extrabold mb-2">Select your role</h2>
+      <div className="grid grid-cols-2 gap-3 mb-8 mt-6">
+        {ROLES.map((role) => (
+          <button
+            key={role.value}
+            type="button"
+            onClick={() => setSelectedRole(role.value)}
+            className={`p-4 rounded-xl border-2 text-left ${selectedRole === role.value ? role.color : 'border-border bg-secondary/30'}`}
+          >
+            <Icon
+              name={role.icon as Parameters<typeof Icon>[0]['name']}
+              size={22}
+              className="mb-2"
+            />
+            <p className="font-bold text-sm">{role.label}</p>
+            <p className="text-xs opacity-70">{role.desc}</p>
+          </button>
+        ))}
       </div>
+      <button
+        type="button"
+        onClick={onNext}
+        className="w-full py-3.5 bg-primary font-bold rounded-xl min-h-[48px]"
+      >
+        Continue as {selectedRole}
+      </button>
+    </div>
+  );
+}
+
+function Input({
+  label,
+  value,
+  onChange,
+  error,
+  type = 'text',
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  error?: string;
+  type?: string;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold mb-1.5">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-4 py-3 bg-background border border-border rounded-xl text-sm"
+      />
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
     </div>
   );
 }

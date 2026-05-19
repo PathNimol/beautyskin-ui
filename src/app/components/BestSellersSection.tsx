@@ -306,7 +306,7 @@ export default function BestSellersSection() {
         {/* View all */}
         <div className="text-center mt-10 scroll-animate">
           <button
-            onClick={() => router.push('/login')}
+            onClick={() => router.push('/product-listing')}
             className="inline-flex items-center gap-2 px-8 py-3.5 bg-foreground text-background font-bold rounded-2xl hover:bg-accent transition-all text-sm shadow-soft min-h-[44px]">
             
             View All Products

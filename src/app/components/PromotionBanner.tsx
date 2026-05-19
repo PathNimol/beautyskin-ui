@@ -98,7 +98,7 @@ export default function PromotionBanner() {
               </p>
 
               <button
-                onClick={() => router.push('/login')}
+                onClick={() => router.push('/product-listing')}
                 className="inline-flex items-center gap-2 px-7 py-3.5 bg-primary text-foreground font-bold rounded-2xl hover:bg-white transition-all shadow-rose text-sm min-h-[44px]">
                 
                 Shop the Sale

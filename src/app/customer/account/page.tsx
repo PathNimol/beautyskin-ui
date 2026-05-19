@@ -1,5 +1,5 @@
 import React from 'react';
-import CustomerAccountClient from '@/app/customer-account/CustomerAccountClient';
+import CustomerAccountClient from '@/components/features/customer-account/CustomerAccountClient';
 
 export default function CustomerAccountPage() {
   return <CustomerAccountClient />;

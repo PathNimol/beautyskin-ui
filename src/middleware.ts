@@ -2,13 +2,24 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Public routes that don't require authentication
-const PUBLIC_ROUTES = ['/', '/login', '/register', '/forgot-password'];
+const PUBLIC_ROUTES = [
+  '/',
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/product-listing',
+  '/cart',
+  '/checkout',
+];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public routes
-  if (PUBLIC_ROUTES.includes(pathname)) {
+  if (
+    PUBLIC_ROUTES.includes(pathname) ||
+    pathname.startsWith('/product-detail/')
+  ) {
     return NextResponse.next();
   }
 

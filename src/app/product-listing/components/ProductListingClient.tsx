@@ -3,10 +3,12 @@ import React, { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
+import { useCart } from '@/contexts/CartContext';
+import { type CatalogProduct } from '@/lib/mock/productCatalog';
+import { useCatalogProducts } from '@/hooks/useCatalogProducts';
 
 // ─── Data ───────────────────────────────────────────────────────────────────
 
-const categories = ['All', 'Moisturizers', 'Serums', 'Cleansers', 'Sunscreen', 'Eye Care', 'Masks'];
 const sortOptions = ['Featured', 'Price: Low to High', 'Price: High to Low', 'Best Rated', 'Newest'];
 const priceRanges = [
   { label: 'All Prices', min: 0, max: Infinity },
@@ -16,38 +18,7 @@ const priceRanges = [
   { label: '$50+', min: 50, max: Infinity },
 ];
 
-interface Product {
-  id: number;
-  name: string;
-  brand: string;
-  price: number;
-  originalPrice: number | null;
-  rating: number;
-  reviews: number;
-  image: string;
-  alt: string;
-  badge: string | null;
-  badgeType: string | null;
-  category: string;
-  inStock: boolean;
-  isNew: boolean;
-  stock: number;
-}
-
-const allProducts: Product[] = [
-  { id: 1, name: 'Glow Essence Serum', brand: 'COSRX', price: 28.99, originalPrice: 38.99, rating: 4.9, reviews: 1247, image: "https://img.rocket.new/generatedImages/rocket_gen_img_14ffa882d-1773310521963.png", alt: 'Clear glass serum bottle with white dropper cap on soft pink background', badge: 'Best Seller', badgeType: 'rose', category: 'Serums', inStock: true, isNew: false, stock: 42 },
-  { id: 2, name: 'Hydra Barrier Cream', brand: 'Laneige', price: 34.00, originalPrice: null, rating: 4.8, reviews: 893, image: "https://img.rocket.new/generatedImages/rocket_gen_img_1e9fd727b-1772071563202.png", alt: 'White cream jar with minimalist label on marble surface with soft shadows', badge: 'New', badgeType: 'accent', category: 'Moisturizers', inStock: true, isNew: true, stock: 8 },
-  { id: 3, name: 'Snail Mucin Essence', brand: 'COSRX', price: 22.50, originalPrice: 29.00, rating: 4.9, reviews: 2103, image: "https://img.rocket.new/generatedImages/rocket_gen_img_10ac1dfcb-1772216203794.png", alt: 'Translucent essence bottle with minimalist Korean label on clean white background', badge: '22% OFF', badgeType: 'sale', category: 'Serums', inStock: true, isNew: false, stock: 65 },
-  { id: 4, name: 'Gentle Foam Cleanser', brand: 'Innisfree', price: 15.99, originalPrice: null, rating: 4.7, reviews: 654, image: "https://images.unsplash.com/photo-1695561115616-b4b719f1a242", alt: 'Green foam cleanser tube with botanical design on light beige background', badge: null, badgeType: null, category: 'Cleansers', inStock: true, isNew: false, stock: 3 },
-  { id: 5, name: 'UV Shield SPF 50+', brand: 'Skin1004', price: 19.99, originalPrice: 24.99, rating: 4.8, reviews: 421, image: "https://img.rocket.new/generatedImages/rocket_gen_img_121d6c73f-1772074800330.png", alt: 'White sunscreen tube with minimal packaging on light cream background', badge: '20% OFF', badgeType: 'sale', category: 'Sunscreen', inStock: true, isNew: false, stock: 27 },
-  { id: 6, name: 'Ceramide Repair Toner', brand: 'Dr. Jart+', price: 42.00, originalPrice: null, rating: 4.6, reviews: 318, image: "https://images.unsplash.com/photo-1616526629549-353331fea648", alt: 'Blue toner bottle with medical-inspired packaging on white background', badge: 'Staff Pick', badgeType: 'info', category: 'Serums', inStock: true, isNew: false, stock: 5 },
-  { id: 7, name: 'Rice Water Brightener', brand: "I'm From", price: 31.00, originalPrice: 40.00, rating: 4.7, reviews: 567, image: "https://images.unsplash.com/photo-1595300398913-3772655443e1", alt: 'White essence bottle with rice grain design on warm cream background', badge: 'Trending', badgeType: 'rose', category: 'Moisturizers', inStock: true, isNew: false, stock: 19 },
-  { id: 8, name: 'Centella Calming Gel', brand: 'Purito', price: 17.50, originalPrice: null, rating: 4.8, reviews: 789, image: "https://img.rocket.new/generatedImages/rocket_gen_img_1c6599022-1772541113609.png", alt: 'Green gel moisturizer tube with centella leaf illustration on white background', badge: null, badgeType: null, category: 'Moisturizers', inStock: false, isNew: false, stock: 0 },
-  { id: 9, name: 'Eye Peptide Cream', brand: 'Sulwhasoo', price: 55.00, originalPrice: null, rating: 4.9, reviews: 234, image: "https://img.rocket.new/generatedImages/rocket_gen_img_1e4c966dd-1773435900095.png", alt: 'Luxury eye cream jar with gold lid on dark marble surface', badge: 'Premium', badgeType: 'accent', category: 'Eye Care', inStock: true, isNew: true, stock: 4 },
-  { id: 10, name: 'Honey Clay Mask', brand: 'Heimish', price: 24.00, originalPrice: 30.00, rating: 4.6, reviews: 445, image: "https://images.unsplash.com/photo-1710693547884-41a6113d67d2", alt: 'Clay mask jar with honey-colored product on cream background', badge: '20% OFF', badgeType: 'sale', category: 'Masks', inStock: true, isNew: false, stock: 7 },
-  { id: 11, name: 'Niacinamide 10% Serum', brand: 'The Ordinary', price: 11.90, originalPrice: null, rating: 4.5, reviews: 3201, image: "https://images.unsplash.com/photo-1728842942519-4b986f62ea62", alt: 'Minimalist serum bottle with clinical label on white background', badge: 'Budget Pick', badgeType: 'info', category: 'Serums', inStock: true, isNew: false, stock: 11 },
-  { id: 12, name: 'Cica Recovery Cream', brand: 'Dr. G', price: 38.50, originalPrice: null, rating: 4.8, reviews: 612, image: "https://images.unsplash.com/photo-1707555647417-960972bb9d5f", alt: 'White recovery cream tube with green cica design on light background', badge: 'New', badgeType: 'accent', category: 'Moisturizers', inStock: true, isNew: true, stock: 23 },
-];
+type Product = CatalogProduct;
 
 const badgeStyles: Record<string, string> = {
   rose: 'bg-rose-light text-rose-deep border border-primary/40',
@@ -85,13 +56,16 @@ function StockBadge({ stock }: { stock: number }) {
   return null;
 }
 
-export default function ProductListingClient() {
+export default function ProductListingClient({ embedded = false }: { embedded?: boolean }) {
+  const { addItem } = useCart();
+  const { products: allProducts, loading: catalogLoading, error: catalogError } = useCatalogProducts();
+  const categories = ['All', ...Array.from(new Set(allProducts.map((p) => p.category)))];
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [activePriceRange, setActivePriceRange] = useState(0);
   const [activeSort, setActiveSort] = useState('Featured');
-  const [cartAdded, setCartAdded] = useState<number[]>([]);
-  const [stockWarning, setStockWarning] = useState<number | null>(null);
+  const [cartAdded, setCartAdded] = useState<string[]>([]);
+  const [stockWarning, setStockWarning] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const activeFilters = useMemo(() => {
@@ -115,16 +89,29 @@ export default function ProductListingClient() {
     return list;
   }, [searchQuery, activeCategory, activePriceRange, activeSort]);
 
-  const handleAddToCart = useCallback((product: Product) => {
-    if (!product.inStock || product.stock === 0) return;
-    // Real-time inventory check
-    if (product.stock <= 5) {
-      setStockWarning(product.id);
-      setTimeout(() => setStockWarning(null), 3000);
-    }
-    setCartAdded((prev) => [...prev, product.id]);
-    setTimeout(() => setCartAdded((prev) => prev.filter((x) => x !== product.id)), 2000);
-  }, []);
+  const handleAddToCart = useCallback(
+    (product: Product) => {
+      if (!product.inStock || product.stock === 0) return;
+      if (product.stock <= 5) {
+        setStockWarning(product.id);
+        setTimeout(() => setStockWarning(null), 3000);
+      }
+      addItem({
+        id: product.id,
+        productId: product.id,
+        name: product.name,
+        brand: product.brand,
+        price: product.price,
+        image: product.image,
+        alt: product.alt,
+        shopId: product.shopId,
+        shopName: product.shopName,
+      });
+      setCartAdded((prev) => [...prev, product.id]);
+      setTimeout(() => setCartAdded((prev) => prev.filter((x) => x !== product.id)), 2000);
+    },
+    [addItem]
+  );
 
   const clearFilters = () => {
     setActiveCategory('All');
@@ -148,6 +135,7 @@ export default function ProductListingClient() {
       )}
 
       {/* Page header */}
+      {!embedded && (
       <div className="bg-secondary/40 border-b border-border px-6 py-10">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
@@ -156,9 +144,10 @@ export default function ProductListingClient() {
             <span className="text-foreground font-medium">Products</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold text-foreground tracking-tight mb-2">All Products</h1>
-          <p className="text-muted-foreground text-sm">{allProducts.length} premium skincare products</p>
+          <p className="text-muted-foreground text-sm">{allProducts.length} products from all shops</p>
         </div>
       </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Search + Sort bar */}
