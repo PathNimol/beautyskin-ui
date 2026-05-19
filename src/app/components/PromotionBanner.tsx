@@ -59,19 +59,21 @@ export default function PromotionBanner() {
   return (
     <section className="py-16 md:py-20 px-6 bg-background">
       <div className="max-w-7xl mx-auto scroll-animate">
-        <div className="relative rounded-3xl overflow-hidden min-h-[320px] flex items-center">
+        <div className="relative rounded-3xl overflow-hidden min-h-[320px] flex items-center bg-foreground">
           {/* Background image — dark scene for white text */}
-          <AppImage
-            src="https://images.unsplash.com/photo-1551562641-9998f16c6bff"
-            alt="Luxurious skincare product arrangement on dark moody background with deep shadows, dramatic low-key lighting, dark velvet surface"
-            fill
-            sizes="100vw"
-            className="object-cover" />
-          
+          <div className="absolute inset-0 z-0">
+            <AppImage
+              src="https://images.unsplash.com/photo-1612817288484-6f916f1975b6?auto=format&fit=crop&w=1600&q=80"
+              alt="Luxurious skincare product arrangement on dark moody background with deep shadows, dramatic low-key lighting, dark velvet surface"
+              fill
+              sizes="(max-width: 1280px) 100vw, 1280px"
+              className="object-cover"
+            />
+          </div>
 
           {/* Dark scrim for white text */}
-          <div className="absolute inset-0 bg-gradient-to-r from-foreground/85 via-foreground/60 to-foreground/20" />
-          <div className="absolute inset-0 bg-gradient-to-t from-foreground/40 via-transparent to-transparent" />
+          <div className="absolute inset-0 z-[1] bg-gradient-to-r from-foreground/85 via-foreground/60 to-foreground/20" />
+          <div className="absolute inset-0 z-[1] bg-gradient-to-t from-foreground/40 via-transparent to-transparent" />
 
           {/* Decorative rose circle */}
           <div className="absolute -right-20 -top-20 w-96 h-96 rounded-full bg-primary/20 blur-3xl pointer-events-none" />

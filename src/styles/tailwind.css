@@ -209,24 +209,6 @@
     box-shadow: 0 2px 16px rgba(43, 43, 43, 0.06), 0 1px 4px rgba(43, 43, 43, 0.04);
   }
 
-  /* Grid decorative lines */
-  .grid-lines-overlay {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 1;
-    display: flex;
-    justify-content: space-between;
-    padding: 0 1.5rem;
-    opacity: 0.06;
-  }
-
-  .grid-line-v {
-    width: 1px;
-    height: 100%;
-    background: linear-gradient(to bottom, transparent, var(--foreground), transparent);
-  }
-
   /* Dot pattern bg */
   .dot-pattern {
     background-image: radial-gradient(circle, rgba(43,43,43,0.06) 1px, transparent 1px);

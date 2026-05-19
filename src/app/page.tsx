@@ -13,14 +13,6 @@ export default function HomePage() {
     <main className="min-h-screen bg-background overflow-x-hidden">
       <ScrollAnimationInit />
 
-      {/* Decorative grid lines */}
-      <div className="grid-lines-overlay pointer-events-none" aria-hidden>
-        <div className="grid-line-v" />
-        <div className="grid-line-v hidden md:block" />
-        <div className="grid-line-v hidden md:block" />
-        <div className="grid-line-v" />
-      </div>
-
       <Header />
       <HeroSection />
       <CategoriesSection />

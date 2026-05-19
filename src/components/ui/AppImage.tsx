@@ -1,7 +1,12 @@
 'use client';
 
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useCallback, useMemo, memo, useEffect } from 'react';
 import Image from 'next/image';
+
+/** Local SVG + remote backup when external images fail to load */
+export const IMAGE_FALLBACK_SRC = '/images/image-fallback.svg';
+const REMOTE_IMAGE_FALLBACK_SRC =
+  'https://images.unsplash.com/photo-1612817288484-6f916f1975b6?auto=format&fit=crop&w=1600&q=80';
 
 interface AppImageProps {
     src: string;
@@ -35,29 +40,44 @@ const AppImage = memo(function AppImage({
     fill = false,
     sizes,
     onClick,
-    fallbackSrc = '/assets/images/no_image.png',
+    fallbackSrc = IMAGE_FALLBACK_SRC,
     loading = 'lazy',
     unoptimized = false,
     ...props
 }: AppImageProps) {
     const [imageSrc, setImageSrc] = useState(src);
     const [isLoading, setIsLoading] = useState(true);
-    const [hasError, setHasError] = useState(false);
+    const [errorStep, setErrorStep] = useState(0);
+
+    useEffect(() => {
+        setImageSrc(src);
+        setIsLoading(true);
+        setErrorStep(0);
+    }, [src]);
 
     const isExternalUrl = useMemo(() => typeof imageSrc === 'string' && imageSrc.startsWith('http'), [imageSrc]);
     const resolvedUnoptimized = unoptimized || isExternalUrl;
 
     const handleError = useCallback(() => {
-        if (!hasError && imageSrc !== fallbackSrc) {
+        if (errorStep === 0 && imageSrc !== fallbackSrc) {
             setImageSrc(fallbackSrc);
-            setHasError(true);
+            setErrorStep(1);
+            return;
+        }
+        if (
+            errorStep <= 1 &&
+            imageSrc !== REMOTE_IMAGE_FALLBACK_SRC &&
+            fallbackSrc !== REMOTE_IMAGE_FALLBACK_SRC
+        ) {
+            setImageSrc(REMOTE_IMAGE_FALLBACK_SRC);
+            setErrorStep(2);
+            return;
         }
         setIsLoading(false);
-    }, [hasError, imageSrc, fallbackSrc]);
+    }, [errorStep, imageSrc, fallbackSrc]);
 
     const handleLoad = useCallback(() => {
         setIsLoading(false);
-        setHasError(false);
     }, []);
 
     const imageClassName = useMemo(() => {
@@ -95,12 +115,12 @@ const AppImage = memo(function AppImage({
 
     if (fill) {
         return (
-            <div className="relative" style={{ width: '100%', height: '100%' }}>
+            <div className={`absolute inset-0 overflow-hidden ${isLoading ? 'bg-muted' : ''}`}>
                 <Image
                     {...imageProps}
                     fill
                     sizes={sizes || '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'}
-                    style={{ objectFit: 'cover' }}
+                    className={`${imageClassName} object-cover`.trim()}
                     {...props}
                 />
             </div>
