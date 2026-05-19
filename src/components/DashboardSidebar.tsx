@@ -224,50 +224,59 @@ const NAV_ITEMS: NavItem[] = [
     label: 'My Account',
     icon: 'UserCircleIcon',
     href: '/customer/account',
-    roles: ['buyer'],
+    roles: ['customer', 'buyer'],
+    section: 'customer',
+  },
+  {
+    label: 'All Products',
+    icon: 'ArchiveBoxIcon',
+    href: '/customer/products',
+    roles: ['customer', 'buyer'],
     section: 'customer',
   },
   {
     label: 'Shop',
     icon: 'ShoppingBagIcon',
     href: '/customer/shop',
-    roles: ['buyer'],
+    roles: ['customer', 'buyer'],
     section: 'customer',
   },
   {
     label: 'Cart',
     icon: 'ShoppingCartIcon',
     href: '/customer/cart',
-    roles: ['buyer'],
+    roles: ['customer', 'buyer'],
     section: 'customer',
   },
   {
     label: 'Chat',
     icon: 'ChatBubbleLeftRightIcon',
     href: '/customer/chat',
-    roles: ['buyer'],
+    roles: ['customer', 'buyer'],
     section: 'customer',
   },
   {
     label: 'Direct Messages',
     icon: 'EnvelopeIcon',
     href: '/customer/direct-messages',
-    roles: ['buyer'],
+    roles: ['customer', 'buyer'],
     section: 'customer',
   },
 ];
 
-const ROLE_COLORS: Record<UserRole, string> = {
+const ROLE_COLORS: Record<string, string> = {
   admin: 'bg-purple-100 text-purple-700',
   owner: 'bg-rose-100 text-rose-700',
   staff: 'bg-blue-100 text-blue-700',
+  customer: 'bg-green-100 text-green-700',
   buyer: 'bg-green-100 text-green-700',
 };
 
-const ROLE_LABELS: Record<UserRole, string> = {
+const ROLE_LABELS: Record<string, string> = {
   admin: 'Super Admin',
   owner: 'Shop Owner',
   staff: 'Staff',
+  customer: 'Customer',
   buyer: 'Customer',
 };
 
@@ -282,7 +291,10 @@ export default function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const visibleItems = NAV_ITEMS.filter((item) => role && item.roles.includes(role));
+  const normalizedRole = role === 'buyer' ? 'customer' : role;
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => normalizedRole && item.roles.includes(normalizedRole as UserRole)
+  );
 
   const handleSignOut = () => {
     signOut();
@@ -294,9 +306,9 @@ export default function DashboardSidebar() {
   const SidebarContent = ({ collapsed = false }: SidebarContentProps) => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className={`flex items-center justify-center px-3 py-3 border-b border-border`}>
+      <Link href="/" className="flex items-center justify-center px-3 py-3 border-b border-border">
         <AppLogo size={collapsed ? 40 : 200} />
-      </div>
+      </Link>
 
       {/* Role badge */}
       {!collapsed && role && (

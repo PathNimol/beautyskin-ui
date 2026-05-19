@@ -6,7 +6,7 @@ import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { MOCK_USERS } from '@/lib/mock/data';
 
-const MOCK_CUSTOMERS = MOCK_USERS.filter((u) => u.role === 'buyer').concat([
+const MOCK_CUSTOMERS = MOCK_USERS.filter((u) => u.role === 'customer' || u.role === 'buyer').concat([
   {
     id: 'cust-002',
     email: 'meilin@email.com',

@@ -33,17 +33,18 @@ export default function AdminSidebar() {
   const SidebarContent = () => (
     <>
       {/* Logo */}
-      <div
+      <Link
+        href="/"
         className={`flex items-center gap-3 px-5 py-5 border-b border-border ${collapsed ? 'justify-center' : ''}`}
       >
         <AppLogo size={32} />
         {!collapsed && (
           <div>
-            <p className="font-bold text-sm text-foreground leading-none">BS Admin</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Beauty Skin</p>
+            <p className="font-bold text-sm text-foreground leading-none">BS Online Shop</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Admin</p>
           </div>
         )}
-      </div>
+      </Link>
 
       {/* Nav */}
       <nav className="flex flex-col gap-1 p-3 flex-1" aria-label="Admin navigation">

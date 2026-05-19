@@ -104,14 +104,14 @@ export default function HeroSection() {
             style={{ transitionDelay: '1800ms' }}>
             
             <button
-              onClick={() => router?.push('/login')}
+              onClick={() => router?.push('/product-listing')}
               className="flex items-center gap-2 px-7 py-3.5 bg-primary text-foreground font-bold rounded-2xl hover:bg-rose-deep hover:text-white transition-all shadow-rose text-sm">
               
               Shop Now
               <Icon name="ArrowRightIcon" size={16} />
             </button>
             <button
-              onClick={() => router?.push('/login')}
+              onClick={() => router?.push('/product-listing')}
               className="flex items-center gap-2 px-7 py-3.5 glass-card text-white font-semibold rounded-2xl hover:bg-white/20 transition-all text-sm border border-white/30">
               
               View Collections
@@ -142,7 +142,7 @@ export default function HeroSection() {
               )}
             </div>
             <button
-              onClick={() => router?.push('/login')}
+              onClick={() => router?.push('/product-listing')}
               className="flex items-center justify-between w-full border-t border-border/60 pt-4 group">
               
               <span className="text-sm font-semibold text-foreground">Explore Bestsellers</span>

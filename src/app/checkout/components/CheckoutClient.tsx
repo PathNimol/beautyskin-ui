@@ -1,13 +1,10 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
-
-const ORDER_ITEMS = [
-{ id: 1, name: 'Glow Essence Serum', brand: 'COSRX', price: 28.99, quantity: 2, image: 'https://img.rocket.new/generatedImages/rocket_gen_img_14ffa882d-1773310521963.png', alt: 'Clear glass serum bottle with white dropper cap on soft pink background' },
-{ id: 2, name: 'Hydra Barrier Cream', brand: 'Laneige', price: 34.00, quantity: 1, image: 'https://img.rocket.new/generatedImages/rocket_gen_img_1e9fd727b-1772071563202.png', alt: 'White cream jar with minimalist label on marble surface' },
-{ id: 3, name: 'UV Shield SPF 50+', brand: 'Skin1004', price: 19.99, quantity: 1, image: 'https://img.rocket.new/generatedImages/rocket_gen_img_121d6c73f-1772074800330.png', alt: 'White sunscreen tube with minimal packaging on light cream background' }];
+import { useMockAuth } from '@/contexts/MockAuthContext';
+import { useCart } from '@/contexts/CartContext';
 
 
 const COUNTRIES = ['United States', 'Cambodia', 'Thailand', 'Singapore', 'Malaysia', 'Vietnam', 'Philippines', 'Indonesia', 'Japan', 'South Korea'];
@@ -31,18 +28,51 @@ interface FormData {
 }
 
 export default function CheckoutClient() {
+  const { user, updateProfile } = useMockAuth();
+  const { items: cartItems, clearCart, subtotal: cartSubtotal } = useCart();
+  const orderItems = cartItems.map((i) => ({
+    id: i.id,
+    name: i.name,
+    brand: i.brand,
+    price: i.price,
+    quantity: i.quantity,
+    image: i.image,
+    alt: i.alt,
+  }));
+
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeStep, setActiveStep] = useState<'shipping' | 'payment'>('shipping');
   const [form, setForm] = useState<FormData>({
     firstName: '', lastName: '', email: '', phone: '',
-    address: '', city: '', state: '', zip: '', country: 'United States',
+    address: '', city: '', state: '', zip: '', country: '',
     paymentMethod: 'card',
     cardNumber: '', cardName: '', expiry: '', cvv: '',
-    saveInfo: false
+    saveInfo: true,
   });
 
-  const subtotal = ORDER_ITEMS.reduce((s, i) => s + i.price * i.quantity, 0);
+  useEffect(() => {
+    if (!user) return;
+    const ship = user.shipping;
+    const [first = '', ...rest] = user.name.split(' ');
+    const last = rest.join(' ') || ship?.lastName || '';
+    setForm((prev) => ({
+      ...prev,
+      firstName: ship?.firstName || first,
+      lastName: ship?.lastName || last,
+      email: user.email || prev.email,
+      phone: user.phone || prev.phone,
+      address: ship?.address || prev.address,
+      city: ship?.city || prev.city,
+      state: ship?.state || prev.state,
+      zip: ship?.zip || prev.zip,
+      country: ship?.country || prev.country,
+    }));
+  }, [user]);
+
+  const subtotal = orderItems.length > 0
+    ? cartSubtotal
+    : 0;
   const shipping = 0;
   const discount = subtotal * 0.10;
   const total = subtotal - discount + shipping;
@@ -51,10 +81,31 @@ export default function CheckoutClient() {
 
   const handlePlaceOrder = () => {
     setLoading(true);
+    if (form.saveInfo && user) {
+      updateProfile({
+        phone: form.phone,
+        shipping: {
+          firstName: form.firstName,
+          lastName: form.lastName,
+          address: form.address,
+          city: form.city,
+          state: form.state,
+          zip: form.zip,
+          country: form.country,
+        },
+      });
+    }
     setTimeout(() => {
       setLoading(false);
       setConfirmed(true);
+      clearCart();
     }, 1500);
+  };
+
+  const fieldPlaceholder = (field: keyof FormData, label: string) => {
+    const val = form[field];
+    if (typeof val === 'string' && val.trim()) return undefined;
+    return label;
   };
 
   const updateForm = (field: keyof FormData, value: string | boolean) => {
@@ -106,7 +157,7 @@ export default function CheckoutClient() {
 
           {/* Order items */}
           <div className="space-y-3 mb-6">
-            {ORDER_ITEMS.map((item) =>
+            {orderItems.map((item) =>
             <div key={item.id} className="flex items-center gap-3 text-left">
                 <div className="w-12 h-12 rounded-xl overflow-hidden bg-secondary shrink-0">
                   <AppImage src={item.image} alt={item.alt} width={48} height={48} className="object-cover w-full h-full" />
@@ -351,7 +402,7 @@ export default function CheckoutClient() {
         <div className="bg-card border border-border rounded-2xl p-5 shadow-card h-fit">
           <h3 className="font-bold text-foreground mb-5">Order Summary</h3>
           <div className="space-y-3 mb-5">
-            {ORDER_ITEMS.map((item) =>
+            {orderItems.map((item) =>
             <div key={item.id} className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl overflow-hidden bg-secondary shrink-0 relative">
                   <AppImage src={item.image} alt={item.alt} width={48} height={48} className="object-cover w-full h-full" />

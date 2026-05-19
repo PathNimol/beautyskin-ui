@@ -2,7 +2,20 @@
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type UserRole = 'admin' | 'owner' | 'staff' | 'buyer';
+export type UserRole = 'admin' | 'owner' | 'staff' | 'customer';
+
+/** @deprecated use `customer` */
+export type LegacyUserRole = 'buyer';
+
+export interface CustomerShipping {
+  firstName: string;
+  lastName: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
 
 export interface MockUser {
   id: string;
@@ -15,6 +28,7 @@ export interface MockUser {
   avatarAlt: string;
   phone?: string;
   joinDate: string;
+  shipping?: CustomerShipping;
 }
 
 export interface Shop {
@@ -227,11 +241,20 @@ export const MOCK_USERS: MockUser[] = [
   email: 'buyer@beautyskin.com',
   password: 'buyer123',
   name: 'Emma Rodriguez',
-  role: 'buyer',
+  role: 'customer',
   avatar: "https://img.rocket.new/generatedImages/rocket_gen_img_16b7f3773-1772140653588.png",
   avatarAlt: 'Customer Emma Rodriguez with warm smile',
-  phone: '+1 555-0005',
-  joinDate: 'Jun 20, 2024'
+  phone: '+855 12 345 678',
+  joinDate: 'Jun 20, 2024',
+  shipping: {
+    firstName: 'Emma',
+    lastName: 'Rodriguez',
+    address: '123 Riverside Blvd, Apt 4B',
+    city: 'Phnom Penh',
+    state: 'Phnom Penh',
+    zip: '12000',
+    country: 'Cambodia',
+  },
 }];
 
 

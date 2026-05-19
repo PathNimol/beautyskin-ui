@@ -4,6 +4,8 @@ import Link from 'next/link';
 import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
+import { useCart } from '@/contexts/CartContext';
+import { getRoleHomePath } from '@/lib/auth/redirects';
 
 const navLinks = [
   { label: 'Home', href: '/' },
@@ -15,8 +17,8 @@ const navLinks = [
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [cartCount] = useState(3);
-  const { isAuthenticated, role, user, signOut } = useMockAuth();
+  const { itemCount: cartCount } = useCart();
+  const { isAuthenticated, role, signOut } = useMockAuth();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40);
@@ -35,7 +37,7 @@ export default function Header() {
     };
   }, [menuOpen]);
 
-  const dashboardHref = role === 'buyer' ? '/customer-account' : '/dashboard';
+  const dashboardHref = role === 'customer' || role === 'buyer' ? '/customer/account' : getRoleHomePath(role);
 
   return (
     <>
@@ -96,7 +98,7 @@ export default function Header() {
                   className="hidden md:flex items-center gap-2 px-4 py-2 bg-primary text-foreground text-sm font-semibold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose"
                 >
                   <Icon name="Squares2X2Icon" size={15} />
-                  {role === 'buyer' ? 'My Account' : 'Dashboard'}
+                  {role === 'customer' || role === 'buyer' ? 'My Account' : 'Dashboard'}
                 </Link>
                 <button
                   onClick={signOut}
@@ -174,7 +176,7 @@ export default function Header() {
                       className="flex items-center gap-2 px-4 py-3 bg-primary text-foreground rounded-xl font-semibold hover:bg-rose-deep hover:text-white transition-all"
                     >
                       <Icon name="Squares2X2Icon" size={16} />
-                      {role === 'buyer' ? 'My Account' : 'Dashboard'}
+                      {role === 'customer' || role === 'buyer' ? 'My Account' : 'Dashboard'}
                     </Link>
                     <button
                       onClick={() => {
