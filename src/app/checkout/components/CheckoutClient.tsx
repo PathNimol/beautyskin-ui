@@ -27,7 +27,9 @@ interface FormData {
   saveInfo: boolean;
 }
 
-export default function CheckoutClient() {
+export default function CheckoutClient({ embedded = false }: { embedded?: boolean }) {
+  const shopHref = embedded ? '/customer/products' : '/product-listing';
+  const cartHref = embedded ? '/customer/cart' : '/cart';
   const { user, updateProfile } = useMockAuth();
   const { items: cartItems, clearCart, subtotal: cartSubtotal } = useCart();
   const orderItems = cartItems.map((i) => ({
@@ -194,7 +196,7 @@ export default function CheckoutClient() {
             <Link href="/" className="flex-1 py-3 bg-secondary text-foreground font-semibold rounded-xl hover:bg-border transition-all text-sm text-center">
               Back to Home
             </Link>
-            <Link href="/product-listing" className="flex-1 py-3 bg-primary text-foreground font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose text-sm text-center">
+            <Link href={shopHref} className="flex-1 py-3 bg-primary text-foreground font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose text-sm text-center">
               Continue Shopping
             </Link>
           </div>
@@ -204,17 +206,23 @@ export default function CheckoutClient() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-6">
-        <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
-        <span>/</span>
-        <Link href="/cart" className="hover:text-foreground transition-colors">Cart</Link>
-        <span>/</span>
-        <span className="text-foreground font-medium">Checkout</span>
-      </div>
-
-      <h1 className="text-3xl font-extrabold text-foreground tracking-tight mb-8">Checkout</h1>
+    <div className={`max-w-7xl mx-auto px-6 ${embedded ? 'py-0' : 'py-10'}`}>
+      {!embedded && (
+        <>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-6">
+            <Link href="/" className="hover:text-foreground transition-colors">
+              Home
+            </Link>
+            <span>/</span>
+            <Link href={cartHref} className="hover:text-foreground transition-colors">
+              Cart
+            </Link>
+            <span>/</span>
+            <span className="text-foreground font-medium">Checkout</span>
+          </div>
+          <h1 className="text-3xl font-extrabold text-foreground tracking-tight mb-8">Checkout</h1>
+        </>
+      )}
 
       {/* Step tabs */}
       <div className="flex items-center gap-4 mb-8">

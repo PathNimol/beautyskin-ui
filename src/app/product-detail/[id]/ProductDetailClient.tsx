@@ -1,10 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
-import { MOCK_PRODUCTS, MOCK_REVIEWS } from '@/lib/mock/data';
+import { MOCK_REVIEWS } from '@/lib/mock/data';
+import type { Product, Review } from '@/lib/mock/data';
+import { getProduct, listCatalog } from '@/lib/api/services/products';
+import { mapApiProductToMock } from '@/lib/api/mappers';
+import type { ApiProduct } from '@/lib/api/types';
+import { useCart } from '@/contexts/CartContext';
 
 interface ReviewFormData {
   rating: number;
@@ -14,28 +19,82 @@ interface ReviewFormData {
   photoPreview: string | null;
 }
 
-export default function ProductDetailClient({ productId }: {productId: string;}) {
-  const product = MOCK_PRODUCTS.find((p) => p.id === productId) || MOCK_PRODUCTS[0];
-  const reviews = MOCK_REVIEWS.filter((r) => r.productId === product.id);
+export default function ProductDetailClient({ productId }: { productId: string }) {
+  const { addItem } = useCart();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<'description' | 'ingredients' | 'howto' | 'reviews'>('description');
   const [addedToCart, setAddedToCart] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewForm, setReviewForm] = useState<ReviewFormData>({ rating: 5, title: '', body: '', skinType: '', photoPreview: null });
+  const [reviewForm, setReviewForm] = useState<ReviewFormData>({
+    rating: 5,
+    title: '',
+    body: '',
+    skinType: '',
+    photoPreview: null,
+  });
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [hoverRating, setHoverRating] = useState(0);
-  const [localReviews, setLocalReviews] = useState(reviews);
+  const [localReviews, setLocalReviews] = useState<Review[]>([]);
 
-  const avgRating = localReviews.length > 0 ? localReviews.reduce((sum, r) => sum + r.rating, 0) / localReviews.length : product.rating;
-  const ratingCounts = [5, 4, 3, 2, 1].map((star) => ({
-    star,
-    count: localReviews.filter((r) => r.rating === star).length,
-    percent: localReviews.length > 0 ? localReviews.filter((r) => r.rating === star).length / localReviews.length * 100 : 0
-  }));
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const apiProduct = await getProduct(productId);
+        if (cancelled) return;
+        const mapped = mapApiProductToMock(apiProduct);
+        setProduct(mapped);
+        setSelectedImage(0);
+        setQuantity(1);
+        setLocalReviews(MOCK_REVIEWS.filter((r) => r.productId === mapped.id));
+
+        const relatedPage = await listCatalog({
+          category: apiProduct.category,
+          limit: 24,
+          page: 1,
+        });
+        if (cancelled) return;
+        const related = relatedPage.content
+          .filter((p: ApiProduct) => p.id !== apiProduct.id)
+          .slice(0, 4)
+          .map((p: ApiProduct) => mapApiProductToMock(p));
+        setRelatedProducts(related);
+      } catch {
+        if (!cancelled) {
+          setProduct(null);
+          setRelatedProducts([]);
+          setLoadError('Could not load this product from the API.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [productId]);
 
   const handleAddToCart = () => {
+    if (!product || product.stock === 0) return;
+    addItem({
+      id: product.id,
+      productId: product.id,
+      name: product.name,
+      brand: product.brand,
+      price: product.price,
+      image: product.image,
+      alt: product.imageAlt,
+      shopId: product.shopId,
+      shopName: product.shopName || 'Shop',
+    });
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2000);
   };
@@ -51,6 +110,7 @@ export default function ProductDetailClient({ productId }: {productId: string;})
 
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!product) return;
     const newReview = {
       id: `rev-new-${Date.now()}`,
       productId: product.id,
@@ -67,7 +127,7 @@ export default function ProductDetailClient({ productId }: {productId: string;})
       createdAt: 'Just now',
       skinType: reviewForm.skinType
     };
-    setLocalReviews((prev) => [newReview, ...prev]);
+    setLocalReviews((prev) => [newReview as Review, ...prev]);
     setReviewSubmitted(true);
     setShowReviewForm(false);
     setReviewForm({ rating: 5, title: '', body: '', skinType: '', photoPreview: null });
@@ -75,7 +135,37 @@ export default function ProductDetailClient({ productId }: {productId: string;})
     setActiveTab('reviews');
   };
 
-  const relatedProducts = MOCK_PRODUCTS.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
+  if (loading) {
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center text-muted-foreground text-sm">
+        Loading product…
+      </div>
+    );
+  }
+
+  if (loadError || !product) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+        <p className="text-foreground font-semibold mb-2">{loadError ?? 'Product not found'}</p>
+        <Link href="/product-listing" className="text-accent font-bold hover:underline">
+          Browse all products
+        </Link>
+      </div>
+    );
+  }
+
+  const avgRating =
+    localReviews.length > 0
+      ? localReviews.reduce((sum, r) => sum + r.rating, 0) / localReviews.length
+      : product.rating;
+  const ratingCounts = [5, 4, 3, 2, 1].map((star) => ({
+    star,
+    count: localReviews.filter((r) => r.rating === star).length,
+    percent:
+      localReviews.length > 0
+        ? (localReviews.filter((r) => r.rating === star).length / localReviews.length) * 100
+        : 0,
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -152,9 +242,9 @@ export default function ProductDetailClient({ productId }: {productId: string;})
             </div>
 
             <div className="flex items-baseline gap-3">
-              <span className="text-3xl font-extrabold text-foreground">${product.price}</span>
+              <span className="text-3xl font-extrabold text-foreground">${product.price.toFixed(2)}</span>
               {product.originalPrice &&
-              <span className="text-lg text-muted-foreground line-through">${product.originalPrice}</span>
+              <span className="text-lg text-muted-foreground line-through">${product.originalPrice.toFixed(2)}</span>
               }
             </div>
 
@@ -523,7 +613,7 @@ export default function ProductDetailClient({ productId }: {productId: string;})
                   <div className="p-3">
                     <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">{related.brand}</p>
                     <p className="text-xs font-bold text-foreground mt-1 leading-snug line-clamp-2">{related.name}</p>
-                    <p className="text-sm font-extrabold text-foreground mt-2">${related.price}</p>
+                    <p className="text-sm font-extrabold text-foreground mt-2">${related.price.toFixed(2)}</p>
                   </div>
                 </Link>
             )}

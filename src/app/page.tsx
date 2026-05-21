@@ -3,6 +3,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import HeroSection from '@/app/components/HeroSection';
 import CategoriesSection from '@/app/components/CategoriesSection';
+import BeautyGallerySection from '@/app/components/BeautyGallerySection';
 import BestSellersSection from '@/app/components/BestSellersSection';
 import PromotionBanner from '@/app/components/PromotionBanner';
 import ReviewsSection from '@/app/components/ReviewsSection';
@@ -16,6 +17,7 @@ export default function HomePage() {
       <Header />
       <HeroSection />
       <CategoriesSection />
+      <BeautyGallerySection />
       <BestSellersSection />
       <PromotionBanner />
       <ReviewsSection />

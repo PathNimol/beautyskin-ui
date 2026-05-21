@@ -8,7 +8,6 @@ import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import SocialAuthButtons, { type OAuthProvider } from '@/components/auth/SocialAuthButtons';
 import { sanitizeRedirect } from '@/lib/auth/redirects';
-import { findUserByEmail } from '@/lib/mock/authStore';
 
 const ROLE_HINTS = [
   {
@@ -37,12 +36,6 @@ const ROLE_HINTS = [
   },
 ];
 
-const OAUTH_EMAILS: Record<OAuthProvider, string> = {
-  google: 'google.user@beautyskin.com',
-  facebook: 'facebook.user@beautyskin.com',
-  tiktok: 'tiktok.user@beautyskin.com',
-};
-
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -55,18 +48,13 @@ function LoginForm() {
 
   const redirectParam = searchParams.get('redirect');
 
-  const goAfterLogin = (userEmail: string) => {
-    const found = findUserByEmail(userEmail);
-    router.push(sanitizeRedirect(redirectParam, found?.role ?? 'customer'));
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await signIn(email, password);
-      goAfterLogin(email);
+      const user = await signIn(email, password);
+      router.push(sanitizeRedirect(redirectParam, user.role));
     } catch {
       setError('Invalid email or password. Try demo credentials below or register.');
     } finally {
@@ -77,8 +65,8 @@ function LoginForm() {
   const handleOAuth = async (provider: OAuthProvider) => {
     setError('');
     try {
-      await signInWithOAuth(provider);
-      goAfterLogin(OAUTH_EMAILS[provider]);
+      const user = await signInWithOAuth(provider);
+      router.push(sanitizeRedirect(redirectParam, user.role));
     } catch {
       setError(`Could not sign in with ${provider}.`);
     }

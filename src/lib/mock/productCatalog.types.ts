@@ -1,5 +1,7 @@
 export interface CatalogProduct {
   id: string;
+  /** Stable seed / catalog key; matches Spring product.sku */
+  sku: string;
   name: string;
   brand: string;
   price: number;

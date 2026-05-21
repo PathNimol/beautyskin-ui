@@ -2,11 +2,11 @@
 
 import React, { useState, useCallback, useMemo, memo, useEffect } from 'react';
 import Image from 'next/image';
+import { beautyHero } from '@/lib/media/beautyImages';
 
 /** Local SVG + remote backup when external images fail to load */
 export const IMAGE_FALLBACK_SRC = '/images/image-fallback.svg';
-const REMOTE_IMAGE_FALLBACK_SRC =
-  'https://images.unsplash.com/photo-1612817288484-6f916f1975b6?auto=format&fit=crop&w=1600&q=80';
+const REMOTE_IMAGE_FALLBACK_SRC = beautyHero.imageFallback;
 
 interface AppImageProps {
     src: string;

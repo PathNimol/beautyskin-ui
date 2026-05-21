@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
+import { beautyHero } from '@/lib/media/beautyImages';
 
 interface TimeLeft {
   hours: number;
@@ -63,7 +64,7 @@ export default function PromotionBanner() {
           {/* Background image — dark scene for white text */}
           <div className="absolute inset-0 z-0">
             <AppImage
-              src="https://images.unsplash.com/photo-1612817288484-6f916f1975b6?auto=format&fit=crop&w=1600&q=80"
+              src={beautyHero.moodyProducts}
               alt="Luxurious skincare product arrangement on dark moody background with deep shadows, dramatic low-key lighting, dark velvet surface"
               fill
               sizes="(max-width: 1280px) 100vw, 1280px"

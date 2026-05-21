@@ -1,9 +1,10 @@
 import { productsApi, mapApiProductToCatalog } from '@/lib/api';
+import type { PageData } from '@/lib/api/types';
 import type { CatalogProduct } from './productCatalog.types';
 
 export type { CatalogProduct } from './productCatalog.types';
 
-export async function fetchCatalogProducts(params?: {
+export type CatalogPageParams = {
   search?: string;
   category?: string;
   minPrice?: number;
@@ -11,17 +12,30 @@ export async function fetchCatalogProducts(params?: {
   sort?: string;
   page?: number;
   limit?: number;
-}): Promise<CatalogProduct[]> {
-  const page = await productsApi.listCatalog({
+};
+
+export async function fetchCatalogPage(
+  params?: CatalogPageParams
+): Promise<PageData<CatalogProduct>> {
+  const raw = await productsApi.listCatalog({
     search: params?.search,
     category: params?.category && params.category !== 'All' ? params.category : undefined,
     minPrice: params?.minPrice != null ? String(params.minPrice) : undefined,
     maxPrice: params?.maxPrice != null && params.maxPrice !== Infinity ? String(params.maxPrice) : undefined,
     sort: mapSort(params?.sort),
     page: params?.page ?? 1,
-    limit: params?.limit ?? 48,
+    limit: params?.limit ?? 12,
   });
-  return page.content.map(mapApiProductToCatalog);
+  return {
+    ...raw,
+    content: raw.content.map(mapApiProductToCatalog),
+  };
+}
+
+/** Loads first page only — prefer {@link fetchCatalogPage} for listings. */
+export async function fetchCatalogProducts(params?: CatalogPageParams): Promise<CatalogProduct[]> {
+  const page = await fetchCatalogPage({ ...params, limit: params?.limit ?? 80 });
+  return page.content;
 }
 
 export async function fetchCatalogProductById(id: string): Promise<CatalogProduct | undefined> {

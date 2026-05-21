@@ -19,12 +19,24 @@ export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+  /** Local demo session — skip API /users/me on reload */
+  isMock?: boolean;
 }
 
+/** Response from POST /auth/register (no tokens until confirm). */
+export interface RegisterPendingResponse {
+  email: string;
+  verificationRequired: boolean;
+  message: string;
+}
+
+/** Mirrors Spring `UserResponse` (camelCase JSON). */
 export interface ApiUser {
   id: string;
   email: string;
-  name: string;
+  /** Legacy UI field; prefer `fullName` from API when present */
+  name?: string;
+  fullName?: string;
   firstName?: string;
   lastName?: string;
   role: string;

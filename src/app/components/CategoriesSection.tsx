@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import AppImage from '@/components/ui/AppImage';
+import { beautyCategories } from '@/lib/media/beautyImages';
 
 /**
  * BENTO GRID AUDIT — 6 cards
@@ -20,7 +21,7 @@ const categories = [
   name: 'Moisturizers',
   desc: 'Deep hydration for every skin type',
   count: '32 products',
-  image: "https://img.rocket.new/generatedImages/rocket_gen_img_19bbf9167-1772070088385.png",
+  image: beautyCategories.moisturizers,
   alt: 'Cream moisturizer jar with white lid on marble surface, soft natural lighting',
   span: 'md:col-span-2 md:row-span-2',
   textSize: 'text-2xl md:text-3xl',
@@ -32,7 +33,7 @@ const categories = [
   name: 'Serums',
   desc: 'Targeted treatments',
   count: '24 products',
-  image: "https://images.unsplash.com/photo-1681487785847-c76e0dfd90e0",
+  image: beautyCategories.serums,
   alt: 'Glass dropper serum bottle with golden cap on light pink background',
   span: 'md:col-span-1',
   textSize: 'text-xl',
@@ -44,7 +45,7 @@ const categories = [
   name: 'Cleansers',
   desc: 'Gentle daily care',
   count: '18 products',
-  image: "https://images.unsplash.com/photo-1695561115616-b4b719f1a242",
+  image: beautyCategories.cleansers,
   alt: 'White foam cleanser tube on light beige background with botanical leaves',
   span: 'md:col-span-1',
   textSize: 'text-xl',
@@ -56,7 +57,7 @@ const categories = [
   name: 'Sunscreen',
   desc: 'SPF protection',
   count: '12 products',
-  image: "https://images.unsplash.com/photo-1681810814668-b498f00d4530",
+  image: beautyCategories.sunscreen,
   alt: 'White sunscreen tube with pastel yellow packaging on cream background',
   span: 'md:col-span-1',
   textSize: 'text-xl',
@@ -68,7 +69,7 @@ const categories = [
   name: 'Eye Care',
   desc: 'Under-eye solutions',
   count: '10 products',
-  image: "https://img.rocket.new/generatedImages/rocket_gen_img_100fe7f14-1772269740248.png",
+  image: beautyCategories.eyeCare,
   alt: 'Small eye cream jar with silver lid on white marble surface, minimal styling',
   span: 'md:col-span-1',
   textSize: 'text-xl',
@@ -80,7 +81,7 @@ const categories = [
   name: 'Masks & Treatments',
   desc: 'Weekly ritual boosters for radiant, glass skin',
   count: '20 products',
-  image: "https://images.unsplash.com/photo-1636467769776-6c8db2bf3b3c",
+  image: beautyCategories.masks,
   alt: 'Sheet mask and clay mask products arranged on cream background with pink flower petals',
   span: 'md:col-span-4',
   textSize: 'text-2xl md:text-4xl',
@@ -130,6 +131,7 @@ export default function CategoriesSection() {
               alt={cat?.alt}
               fill
               sizes="(max-width: 768px) 100vw, 50vw"
+              unoptimized
               className="object-cover group-hover:scale-105 transition-transform duration-700" />
             
 

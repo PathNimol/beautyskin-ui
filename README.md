@@ -32,7 +32,12 @@ Create **`.env.local`** in the project root (do not commit secrets). Typical key
 NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
 NEXT_PUBLIC_SITE_URL=http://localhost:4028
+
+# Spring REST API (auth, cart, catalog, etc.) — base URL including `/api`
+NEXT_PUBLIC_API_URL=http://localhost:8080/api
 ```
+
+See **`.env.example`** for optional **`API_URL`** alias (resolved in `next.config.mjs` when `NEXT_PUBLIC_API_URL` is unset).
 
 - Without these, **Supabase-backed screens** may show errors or empty data; many **owner/staff/admin customer** UIs still load using **mock data** in the browser.
 - With them applied, run SQL migrations on your Supabase project (see step 4).

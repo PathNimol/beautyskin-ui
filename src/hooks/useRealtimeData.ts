@@ -316,9 +316,12 @@ export function useRealtimeStaff(shopId?: string) {
     }
   }, [shopId]);
 
-  const batchInsertStaff = useCallback(async () => ({ inserted: 0, errors: [] as string[] }), []);
-  const removeStaffMember = useCallback(async () => true, []);
-  const updateStaffRole = useCallback(async () => true, []);
+  const batchInsertStaff = useCallback(
+    async (_rows: unknown[]) => ({ inserted: 0, errors: [] as string[] }),
+    []
+  );
+  const removeStaffMember = useCallback(async (_staffId: string) => true, []);
+  const updateStaffRole = useCallback(async (_staffId: string, _role: DbStaff['role']) => true, []);
 
   useEffect(() => {
     fetchStaff();

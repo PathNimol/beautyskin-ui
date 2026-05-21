@@ -7,6 +7,7 @@ import type {
 } from '@/hooks/useRealtimeData';
 import type { ApiOrder, ApiProduct, ApiShop, ApiUser, ApiInventoryItem, ApiNotification } from './types';
 import type { CatalogProduct } from '@/lib/mock/productCatalog';
+import { isValidProductImage, resolveProductImageUrl } from './productImage';
 
 function titleCaseEnum(value: string): string {
   if (!value) return value;
@@ -26,15 +27,20 @@ function snakeStatus(value: string): DbInventoryItem['inv_status'] {
 }
 
 export function mapApiUserToMock(user: ApiUser): MockUser {
+  const displayName =
+    user.fullName?.trim() ||
+    user.name?.trim() ||
+    [user.firstName, user.lastName].filter(Boolean).join(' ').trim() ||
+    user.email;
   return {
     id: user.id,
     email: user.email,
     password: '',
-    name: user.name,
+    name: displayName,
     role: (user.role?.toLowerCase() || 'customer') as MockUser['role'],
     shopId: user.shopId ?? undefined,
     avatar: user.avatar || '',
-    avatarAlt: user.avatarAlt || user.name,
+    avatarAlt: user.avatarAlt || displayName,
     phone: user.phone,
     joinDate: user.joinDate || new Date().toISOString(),
     shipping: user.shipping as CustomerShipping | undefined,
@@ -174,18 +180,41 @@ export function mapApiProductToCatalog(p: ApiProduct): CatalogProduct {
   const hasSale = p.originalPrice != null && p.originalPrice > p.price;
   const pct = hasSale ? Math.round((1 - p.price / (p.originalPrice as number)) * 100) : 0;
   const tags = p.tags || [];
+
+  let badge: string | null = null;
+  let badgeType: string | null = null;
+  if (hasSale) {
+    badge = `${pct}% OFF`;
+    badgeType = 'sale';
+  } else if (tags.includes('bestseller')) {
+    badge = 'Best Seller';
+    badgeType = 'rose';
+  } else if (tags.includes('new')) {
+    badge = 'New';
+    badgeType = 'accent';
+  } else if (tags.includes('trending')) {
+    badge = 'Trending';
+    badgeType = 'rose';
+  } else if (tags.includes('staff_pick')) {
+    badge = 'Staff Pick';
+    badgeType = 'info';
+  }
+
+  const { image, alt } = resolveProductImageUrl(p);
+
   return {
     id: p.id,
+    sku: p.sku,
     name: p.name,
     brand: p.brand,
     price: Number(p.price),
     originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
     rating: p.rating,
     reviews: p.reviewCount,
-    image: p.image,
-    alt: p.imageAlt,
-    badge: hasSale ? `${pct}% OFF` : tags.includes('bestseller') ? 'Best Seller' : tags.includes('new') ? 'New' : null,
-    badgeType: hasSale ? 'sale' : tags.includes('bestseller') ? 'rose' : tags.includes('new') ? 'accent' : null,
+    image,
+    alt,
+    badge,
+    badgeType,
     category: p.category,
     inStock: p.stock > 0 && p.status !== 'OUT_OF_STOCK',
     isNew: tags.includes('new'),
@@ -195,7 +224,22 @@ export function mapApiProductToCatalog(p: ApiProduct): CatalogProduct {
   };
 }
 
+function mapApiProductDetailStatus(p: ApiProduct): Product['status'] {
+  const normalized = (p.status || 'ACTIVE').toUpperCase().replace(/-/g, '_');
+  if (p.stock === 0 || normalized === 'OUT_OF_STOCK') return 'out_of_stock';
+  if (normalized === 'LOW_STOCK') return 'low_stock';
+  if (normalized === 'EXPIRING_SOON') return 'expiring_soon';
+  if (normalized === 'EXPIRED') return 'expired';
+  if (normalized === 'ACTIVE' && p.stock > 0 && p.stock <= 10) return 'low_stock';
+  return 'active';
+}
+
 export function mapApiProductToMock(p: ApiProduct): Product {
+  const { image, alt } = resolveProductImageUrl(p);
+  const gallery = (p.images || [])
+    .filter((img) => isValidProductImage(img.src))
+    .map((img) => ({ src: img.src, alt: img.alt || alt }));
+
   return {
     id: p.id,
     name: p.name,
@@ -207,9 +251,9 @@ export function mapApiProductToMock(p: ApiProduct): Product {
     sold: p.sold,
     rating: p.rating,
     reviewCount: p.reviewCount,
-    image: p.image,
-    imageAlt: p.imageAlt,
-    images: (p.images || []).map((img) => ({ src: img.src, alt: img.alt })),
+    image,
+    imageAlt: alt,
+    images: gallery.length > 0 ? gallery : image ? [{ src: image, alt }] : [],
     description: p.description || '',
     ingredients: p.ingredients || [],
     howToUse: p.howToUse || '',
@@ -217,7 +261,8 @@ export function mapApiProductToMock(p: ApiProduct): Product {
     expiryDate: p.expiryDate || '',
     sku: p.sku,
     shopId: p.shopId,
-    status: (p.status?.toLowerCase().replace(/_/g, '_') || 'active') as Product['status'],
+    shopName: p.shopName || '',
+    status: mapApiProductDetailStatus(p),
     tags: p.tags || [],
     weight: p.weight || '',
     origin: p.origin || '',

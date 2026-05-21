@@ -1,13 +1,14 @@
 import React from 'react';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
+import { beautyPortraits } from '@/lib/media/beautyImages';
 
 const reviews = [
 {
   id: 1,
   name: 'Mia Johnson',
   role: 'Verified Buyer',
-  avatar: "https://img.rocket.new/generatedImages/rocket_gen_img_1810e1bd6-1772870802498.png",
+  avatar: beautyPortraits.mia,
   avatarAlt: 'Young woman with warm smile, natural lighting, casual style',
   rating: 5,
   text: "The Glow Essence Serum completely transformed my skin. After just 2 weeks, my hyperpigmentation faded and I finally have that glass-skin look I've been chasing. 100% repurchasing.",
@@ -19,7 +20,7 @@ const reviews = [
   id: 2,
   name: 'Sophia Chen',
   role: 'Skincare Enthusiast',
-  avatar: "https://img.rocket.new/generatedImages/rocket_gen_img_125dc2110-1766755117630.png",
+  avatar: beautyPortraits.sophia,
   avatarAlt: 'Asian woman with clear skin and bright eyes, soft background',
   rating: 5,
   text: "I\'ve tried every Korean skincare brand out there. BS Online Shop has the most authentic selection and the fastest shipping. The Snail Mucin Essence is my holy grail — nothing compares.",
@@ -31,7 +32,7 @@ const reviews = [
   id: 3,
   name: 'Aisha Patel',
   role: 'Beauty Blogger',
-  avatar: "https://img.rocket.new/generatedImages/rocket_gen_img_1902887de-1772088136439.png",
+  avatar: beautyPortraits.aisha,
   avatarAlt: 'South Asian woman with confident expression, bright airy studio',
   rating: 5,
   text: "As a beauty blogger I review hundreds of products. BS Online Shop stands out for their curation — every product is carefully selected. The Ceramide Repair Toner saved my compromised skin barrier.",

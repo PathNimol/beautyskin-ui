@@ -33,3 +33,7 @@ export function applyPromo(code: string) {
     body: JSON.stringify({ code }),
   });
 }
+
+export function removePromo() {
+  return apiFetch<ApiCart>('/cart/promo', { method: 'DELETE' });
+}

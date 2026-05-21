@@ -12,6 +12,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Super Admin',
   owner: 'Shop Owner',
   staff: 'Staff',
+  customer: 'Customer',
   buyer: 'Customer',
 };
 

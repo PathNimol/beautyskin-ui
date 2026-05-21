@@ -10,6 +10,10 @@ const PUBLIC_ROUTES = [
   '/product-listing',
   '/cart',
   '/checkout',
+  '/customer/products',
+  '/customer/shop',
+  '/customer/cart',
+  '/customer/checkout',
 ];
 
 export function middleware(request: NextRequest) {
@@ -19,6 +23,14 @@ export function middleware(request: NextRequest) {
   if (
     PUBLIC_ROUTES.includes(pathname) ||
     pathname.startsWith('/product-detail/')
+  ) {
+    return NextResponse.next();
+  }
+
+  /** Allow nested customer storefront routes (e.g. future dynamic segments). */
+  if (
+    pathname.startsWith('/customer/products/') ||
+    pathname.startsWith('/customer/shop/')
   ) {
     return NextResponse.next();
   }

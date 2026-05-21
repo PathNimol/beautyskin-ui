@@ -1,18 +1,19 @@
 import { apiFetch } from '../client';
-import type { ApiUser, AuthTokens } from '../types';
+import type { ApiUser, RegisterPendingResponse } from '../types';
 
 export interface LoginPayload {
   email: string;
   password: string;
 }
 
+/** Matches Spring `RegisterRequest` (includes confirmPassword). Only CUSTOMER signup is supported server-side. */
 export interface RegisterPayload {
   firstName: string;
   lastName: string;
   email: string;
   phone?: string;
   password: string;
-  role: string;
+  confirmPassword: string;
 }
 
 export interface TokenPayload {
@@ -22,6 +23,11 @@ export interface TokenPayload {
   user: ApiUser;
 }
 
+export interface ConfirmRegistrationPayload {
+  email: string;
+  code: string;
+}
+
 export function login(payload: LoginPayload) {
   return apiFetch<TokenPayload>('/auth/login', {
     method: 'POST',
@@ -29,10 +35,25 @@ export function login(payload: LoginPayload) {
   }, false);
 }
 
+/** Creates PENDING_EMAIL_VERIFICATION account; OTP sent server-side (REGISTER_EMAIL). */
 export function register(payload: RegisterPayload) {
-  return apiFetch<TokenPayload>('/auth/register', {
+  return apiFetch<RegisterPendingResponse>('/auth/register', {
     method: 'POST',
     body: JSON.stringify(payload),
+  }, false);
+}
+
+export function confirmRegistration(payload: ConfirmRegistrationPayload) {
+  return apiFetch<TokenPayload>('/auth/register/confirm', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }, false);
+}
+
+export function logout(refreshToken: string) {
+  return apiFetch<void>('/auth/logout', {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken }),
   }, false);
 }
 

@@ -8,7 +8,7 @@ import Icon from '@/components/ui/AppIcon';
 import OtpVerification from '@/components/auth/OtpVerification';
 import SocialAuthButtons, { type OAuthProvider } from '@/components/auth/SocialAuthButtons';
 import { useMockAuth } from '@/contexts/MockAuthContext';
-import { generateOtp } from '@/lib/mock/authStore';
+import { authApi } from '@/lib/api';
 import { getRoleHomePath } from '@/lib/auth/redirects';
 
 const ROLES = [
@@ -42,9 +42,12 @@ const ROLES = [
   },
 ];
 
+const PASSWORD_HINT =
+  'Use at least 8 characters including one letter and one number (matches server policy).';
+
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, signIn, signInWithOAuth } = useMockAuth();
+  const { registerPending, confirmRegistration, signInWithOAuth } = useMockAuth();
   const [step, setStep] = useState(1);
   const [selectedRole, setSelectedRole] = useState('Customer');
   const [form, setForm] = useState({
@@ -66,48 +69,61 @@ export default function RegisterPage() {
     if (!form.lastName.trim()) e.lastName = 'Last name is required';
     if (!form.email.includes('@')) e.email = 'Valid email is required';
     if (!form.phone.trim()) e.phone = 'Phone number is required';
-    if (form.password.length < 6) e.password = 'Password must be at least 6 characters';
+    const pwdOk =
+      form.password.length >= 8 &&
+      /[A-Za-z]/.test(form.password) &&
+      /\d/.test(form.password);
+    if (!pwdOk) e.password = PASSWORD_HINT;
     if (form.password !== form.confirmPassword) e.confirmPassword = 'Passwords do not match';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleRoleContinue = () => {
+    setRegisterError('');
+    if (selectedRole !== 'Customer') {
+      setRegisterError(
+        'Self-registration is only for shoppers (Customer). Staff, Owner, and Admin accounts are provisioned separately — use Sign in with demo credentials.'
+      );
+      return;
+    }
+    setStep(2);
+  };
+
+  const handleSubmitDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setRegisterError('');
     setLoading(true);
-    setTimeout(() => {
-      generateOtp(form.email);
-      setLoading(false);
-      setStep(3);
-    }, 500);
-  };
-
-  const handleOtpVerified = async () => {
     try {
-      await register({
+      await registerPending({
         firstName: form.firstName,
         lastName: form.lastName,
         email: form.email,
         phone: form.phone,
         password: form.password,
-        uiRole: selectedRole,
+        confirmPassword: form.confirmPassword,
       });
-      await signIn(form.email, form.password);
-      router.push(
-        getRoleHomePath(selectedRole === 'Customer' ? 'customer' : selectedRole.toLowerCase())
-      );
+      setStep(3);
     } catch (err) {
       setRegisterError(err instanceof Error ? err.message : 'Registration failed');
-      setStep(2);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleConfirmCode = async (code: string) => {
+    const user = await confirmRegistration(form.email.trim(), code);
+    router.push(getRoleHomePath(user.role));
+  };
+
+  const handleResendRegistrationOtp = () =>
+    authApi.sendOtp(form.email.trim().toLowerCase(), 'REGISTER_EMAIL');
+
   const handleOAuth = async (provider: OAuthProvider) => {
     try {
-      await signInWithOAuth(provider);
-      router.push('/customer/products');
+      const user = await signInWithOAuth(provider);
+      router.push(getRoleHomePath(user.role));
     } catch {
       setRegisterError(`Could not sign up with ${provider}.`);
     }
@@ -136,8 +152,10 @@ export default function RegisterPage() {
           showPassword={showPassword}
           setShowPassword={setShowPassword}
           loading={loading}
-          handleSubmit={handleSubmit}
-          handleOtpVerified={handleOtpVerified}
+          handleSubmit={handleSubmitDetails}
+          handleRoleContinue={handleRoleContinue}
+          handleConfirmCode={handleConfirmCode}
+          handleResendRegistrationOtp={handleResendRegistrationOtp}
           handleOAuth={handleOAuth}
         />
       </div>
@@ -174,7 +192,9 @@ function MotionRegisterCard(props: {
   setShowPassword: (v: boolean) => void;
   loading: boolean;
   handleSubmit: (e: React.FormEvent) => void;
-  handleOtpVerified: () => void;
+  handleRoleContinue: () => void;
+  handleConfirmCode: (code: string) => Promise<void>;
+  handleResendRegistrationOtp: () => Promise<void>;
   handleOAuth: (p: OAuthProvider) => Promise<void>;
 }) {
   const {
@@ -190,7 +210,9 @@ function MotionRegisterCard(props: {
     setShowPassword,
     loading,
     handleSubmit,
-    handleOtpVerified,
+    handleRoleContinue,
+    handleConfirmCode,
+    handleResendRegistrationOtp,
     handleOAuth,
   } = props;
 
@@ -209,7 +231,7 @@ function MotionRegisterCard(props: {
         <RoleStep
           selectedRole={selectedRole}
           setSelectedRole={setSelectedRole}
-          onNext={() => setStep(2)}
+          onNext={handleRoleContinue}
         />
       )}
 
@@ -310,7 +332,8 @@ function MotionRegisterCard(props: {
       {step === 3 && (
         <OtpVerification
           email={form.email}
-          onVerified={handleOtpVerified}
+          onSubmitCode={handleConfirmCode}
+          onResend={handleResendRegistrationOtp}
           submitLabel="Verify & Create Account"
         />
       )}
