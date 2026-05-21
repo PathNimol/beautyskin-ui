@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { inventoryApi, productsApi } from '@/lib/api';
+import type { ApiProduct } from '@/lib/api/types';
 
 export type DbProductStatus =
   | 'active'
@@ -70,12 +71,6 @@ export interface DbProductStockEvent {
   created_at: string;
 }
 
-function parseNum(v: unknown, fallback = 0): number {
-  if (typeof v === 'number' && !Number.isNaN(v)) return v;
-  if (typeof v === 'string' && v.trim() !== '') return Number(v) || fallback;
-  return fallback;
-}
-
 /** Derive catalog status from stock and expiry (ignores revoke / soft-delete flags). */
 export function computeProductStatus(stock: number, expiryDate: string): DbProductStatus {
   if (stock <= 0) return 'out_of_stock';
@@ -89,81 +84,76 @@ export function computeProductStatus(stock: number, expiryDate: string): DbProdu
   return 'active';
 }
 
-function normalizeProductRow(row: Record<string, unknown>): DbProductRow {
-  const ingredients = Array.isArray(row.ingredients) ? (row.ingredients as string[]) : [];
-  const skin_type = Array.isArray(row.skin_type) ? (row.skin_type as string[]) : [];
-  const tags = Array.isArray(row.tags) ? (row.tags as string[]) : [];
-  const gallery = Array.isArray(row.gallery) ? (row.gallery as string[]) : [];
+function mapStatusFromApi(status: string, stock: number, expiryDate: string): DbProductStatus {
+  const s = status?.toUpperCase() || '';
+  if (s === 'REVOKED') return 'active';
+  if (s === 'INACTIVE' || s === 'DELETED') return 'out_of_stock';
+  if (s === 'EXPIRED') return 'expired';
+  if (s === 'LOW_STOCK') return 'low_stock';
+  if (s === 'OUT_OF_STOCK') return 'out_of_stock';
+  if (s === 'EXPIRING_SOON') return 'expiring_soon';
+  return computeProductStatus(stock, expiryDate);
+}
+
+function apiToRow(p: ApiProduct): DbProductRow {
+  const stock = Number(p.stock) || 0;
+  const expiry = p.expiryDate || '';
   return {
-    id: String(row.id),
-    shop_id: row.shop_id == null ? null : String(row.shop_id),
-    name: String(row.name ?? ''),
-    brand: String(row.brand ?? ''),
-    category: String(row.category ?? ''),
-    price: parseNum(row.price),
-    original_price: row.original_price == null ? null : parseNum(row.original_price),
-    stock: parseNum(row.stock),
-    sold: parseNum(row.sold),
-    rating: parseNum(row.rating),
-    review_count: parseNum(row.review_count),
-    image: String(row.image ?? ''),
-    image_alt: String(row.image_alt ?? ''),
-    description: String(row.description ?? ''),
-    ingredients,
-    how_to_use: String(row.how_to_use ?? ''),
-    skin_type,
-    expiry_date: String(row.expiry_date ?? ''),
-    sku: String(row.sku ?? ''),
-    product_status: (row.product_status as DbProductStatus) || 'active',
-    tags,
-    weight: String(row.weight ?? ''),
-    origin: String(row.origin ?? ''),
-    created_at: String(row.created_at ?? ''),
-    updated_at: String(row.updated_at ?? ''),
-    is_deleted: Boolean(row.is_deleted),
-    is_revoked: Boolean(row.is_revoked),
-    gallery,
+    id: p.id,
+    shop_id: p.shopId || null,
+    name: p.name,
+    brand: p.brand || '',
+    category: p.category || '',
+    price: Number(p.price) || 0,
+    original_price: p.originalPrice != null ? Number(p.originalPrice) : null,
+    stock,
+    sold: Number(p.sold) || 0,
+    rating: Number(p.rating) || 0,
+    review_count: Number(p.reviewCount) || 0,
+    image: p.image || '',
+    image_alt: p.imageAlt || p.name,
+    description: p.description || '',
+    ingredients: p.ingredients || [],
+    how_to_use: p.howToUse || '',
+    skin_type: p.skinTypes || [],
+    expiry_date: expiry,
+    sku: p.sku || '',
+    product_status: mapStatusFromApi(p.status, stock, expiry),
+    tags: p.tags || [],
+    weight: p.weight || '',
+    origin: p.origin || '',
+    created_at: '',
+    updated_at: '',
+    is_deleted: p.status?.toUpperCase() === 'INACTIVE' && !p.visible,
+    is_revoked: p.status?.toUpperCase() === 'REVOKED',
+    gallery: (p.images || []).map((i) => i.src),
   };
 }
 
-async function syncInventoryStock(
-  supabase: ReturnType<typeof createClient>,
-  product: Pick<DbProductRow, 'id' | 'shop_id' | 'stock' | 'sku' | 'name' | 'expiry_date'>
-) {
-  if (!product.shop_id) return;
-  const { data } = await supabase
-    .from('inventory_items')
-    .select('id, min_stock, reorder_point')
-    .eq('product_id', product.id)
-    .maybeSingle();
-
-  if (!data?.id) return;
-
-  const stock = product.stock;
-  const min_stock = parseNum((data as { min_stock?: number }).min_stock, 0);
-  const reorder_point = parseNum((data as { reorder_point?: number }).reorder_point, 10);
-
-  let inv_status: 'healthy' | 'low' | 'critical' | 'out_of_stock' | 'expiring_soon' | 'expired' = 'healthy';
-  if (stock === 0) inv_status = 'out_of_stock';
-  else if (stock < min_stock) inv_status = 'critical';
-  else if (stock < reorder_point) inv_status = 'low';
-
-  const exp = new Date(product.expiry_date);
-  if (!Number.isNaN(exp.getTime())) {
-    const days = (exp.getTime() - Date.now()) / 86400000;
-    if (days < 0) inv_status = 'expired';
-    else if (days < 90 && inv_status === 'healthy') inv_status = 'expiring_soon';
-  }
-
-  await supabase
-    .from('inventory_items')
-    .update({
-      current_stock: stock,
-      inv_status,
-      expiry_date: product.expiry_date,
-      last_restocked: new Date().toISOString(),
-    })
-    .eq('id', data.id);
+function rowToPayload(patch: Partial<DbProductRow>): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (patch.name != null) body.name = patch.name;
+  if (patch.brand != null) body.brand = patch.brand;
+  if (patch.category != null) body.category = patch.category;
+  if (patch.price != null) body.price = patch.price;
+  if (patch.original_price !== undefined) body.originalPrice = patch.original_price;
+  if (patch.stock != null) body.stock = patch.stock;
+  if (patch.image != null) body.image = patch.image;
+  if (patch.image_alt != null) body.imageAlt = patch.image_alt;
+  if (patch.description != null) body.description = patch.description;
+  if (patch.ingredients != null) body.ingredients = patch.ingredients;
+  if (patch.how_to_use != null) body.howToUse = patch.how_to_use;
+  if (patch.skin_type != null) body.skinTypes = patch.skin_type;
+  if (patch.expiry_date != null) body.expiryDate = patch.expiry_date;
+  if (patch.sku != null) body.sku = patch.sku;
+  if (patch.tags != null) body.tags = patch.tags;
+  if (patch.weight != null) body.weight = patch.weight;
+  if (patch.origin != null) body.origin = patch.origin;
+  if (patch.is_revoked != null) body.status = patch.is_revoked ? 'REVOKED' : 'ACTIVE';
+  if (patch.is_deleted === true) body.status = 'INACTIVE';
+  if (patch.is_deleted === false) body.status = 'ACTIVE';
+  if (patch.product_status === 'expired') body.status = 'EXPIRED';
+  return body;
 }
 
 export function useShopProductManagement(shopId: string | undefined) {
@@ -174,24 +164,31 @@ export function useShopProductManagement(shopId: string | undefined) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCategories = useCallback(async () => {
+  const deriveTaxonomy = useCallback((rows: DbProductRow[]) => {
     if (!shopId) return;
-    const supabase = createClient();
-    const { data, error: e } = await supabase
-      .from('shop_categories')
-      .select('*')
-      .eq('shop_id', shopId)
-      .order('name', { ascending: true });
-    if (e) return;
-    setCategories((data as DbShopCategory[]) || []);
-  }, [shopId]);
-
-  const fetchBrands = useCallback(async () => {
-    if (!shopId) return;
-    const supabase = createClient();
-    const { data, error: e } = await supabase.from('shop_brands').select('*').eq('shop_id', shopId).order('name', { ascending: true });
-    if (e) return;
-    setBrands((data as DbShopBrand[]) || []);
+    const catNames = [...new Set(rows.map((p) => p.category).filter(Boolean))];
+    const brandNames = [...new Set(rows.map((p) => p.brand).filter(Boolean))];
+    const now = new Date().toISOString();
+    setCategories(
+      catNames.map((name, i) => ({
+        id: `cat-${i}`,
+        shop_id: shopId,
+        name,
+        is_deleted: false,
+        created_at: now,
+        updated_at: now,
+      }))
+    );
+    setBrands(
+      brandNames.map((name, i) => ({
+        id: `brand-${i}`,
+        shop_id: shopId,
+        name,
+        is_deleted: false,
+        created_at: now,
+        updated_at: now,
+      }))
+    );
   }, [shopId]);
 
   const fetchProducts = useCallback(async () => {
@@ -200,201 +197,130 @@ export function useShopProductManagement(shopId: string | undefined) {
       setLoading(false);
       return;
     }
-    const supabase = createClient();
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fetchError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('shop_id', shopId)
-        .order('name', { ascending: true });
-
-      if (fetchError) {
-        setError(fetchError.message);
-        setProducts([]);
-        return;
-      }
-      setProducts(((data as Record<string, unknown>[]) || []).map(normalizeProductRow));
+      const page = await productsApi.listMerchant(shopId, { limit: 500 });
+      const rows = (page.content || []).map(apiToRow);
+      setProducts(rows);
+      deriveTaxonomy(rows);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load products');
       setProducts([]);
     } finally {
       setLoading(false);
     }
-  }, [shopId]);
-
-  const fetchStockEvents = useCallback(async () => {
-    if (!shopId) return;
-    const supabase = createClient();
-    const { data, error: e } = await supabase
-      .from('product_stock_events')
-      .select('*')
-      .eq('shop_id', shopId)
-      .order('created_at', { ascending: false })
-      .limit(200);
-    if (!e && data) setStockEvents(data as DbProductStockEvent[]);
-  }, [shopId]);
+  }, [shopId, deriveTaxonomy]);
 
   useEffect(() => {
     fetchProducts();
-    fetchCategories();
-    fetchBrands();
-    fetchStockEvents();
-  }, [fetchProducts, fetchCategories, fetchBrands, fetchStockEvents]);
+  }, [fetchProducts]);
 
-  const insertCategory = useCallback(
-    async (name: string) => {
-      if (!shopId || !name.trim()) return { ok: false as const, message: 'Name required' };
-      const supabase = createClient();
-      const { error: e } = await supabase.from('shop_categories').insert({ shop_id: shopId, name: name.trim() });
-      if (e) return { ok: false as const, message: e.message };
-      await fetchCategories();
-      return { ok: true as const };
-    },
-    [shopId, fetchCategories]
-  );
+  const insertCategory = useCallback(async (name: string) => {
+    if (!shopId || !name.trim()) return { ok: false as const, message: 'Name required' };
+    const now = new Date().toISOString();
+    setCategories((prev) => [
+      ...prev,
+      { id: `cat-${Date.now()}`, shop_id: shopId, name: name.trim(), is_deleted: false, created_at: now, updated_at: now },
+    ]);
+    return { ok: true as const };
+  }, [shopId]);
 
-  const softDeleteCategory = useCallback(
-    async (id: string) => {
-      const supabase = createClient();
-      const { error: e } = await supabase.from('shop_categories').update({ is_deleted: true }).eq('id', id);
-      if (e) return false;
-      await fetchCategories();
-      return true;
-    },
-    [fetchCategories]
-  );
+  const softDeleteCategory = useCallback(async (id: string) => {
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, is_deleted: true } : c)));
+    return true;
+  }, []);
 
-  const insertBrand = useCallback(
-    async (name: string) => {
-      if (!shopId || !name.trim()) return { ok: false as const, message: 'Name required' };
-      const supabase = createClient();
-      const { error: e } = await supabase.from('shop_brands').insert({ shop_id: shopId, name: name.trim() });
-      if (e) return { ok: false as const, message: e.message };
-      await fetchBrands();
-      return { ok: true as const };
-    },
-    [shopId, fetchBrands]
-  );
+  const insertBrand = useCallback(async (name: string) => {
+    if (!shopId || !name.trim()) return { ok: false as const, message: 'Name required' };
+    const now = new Date().toISOString();
+    setBrands((prev) => [
+      ...prev,
+      { id: `brand-${Date.now()}`, shop_id: shopId, name: name.trim(), is_deleted: false, created_at: now, updated_at: now },
+    ]);
+    return { ok: true as const };
+  }, [shopId]);
 
-  const softDeleteBrand = useCallback(
-    async (id: string) => {
-      const supabase = createClient();
-      const { error: e } = await supabase.from('shop_brands').update({ is_deleted: true }).eq('id', id);
-      if (e) return false;
-      await fetchBrands();
-      return true;
-    },
-    [fetchBrands]
-  );
+  const softDeleteBrand = useCallback(async (id: string) => {
+    setBrands((prev) => prev.map((b) => (b.id === id ? { ...b, is_deleted: true } : b)));
+    return true;
+  }, []);
 
   const insertProduct = useCallback(
     async (payload: Partial<DbProductRow> & { name: string; shop_id: string }) => {
-      const supabase = createClient();
-      const status = computeProductStatus(payload.stock ?? 0, payload.expiry_date ?? '');
-      const row = {
-        shop_id: payload.shop_id,
-        name: payload.name,
-        brand: payload.brand ?? '',
-        category: payload.category ?? '',
-        price: payload.price ?? 0,
-        original_price: payload.original_price ?? null,
-        stock: payload.stock ?? 0,
-        sold: payload.sold ?? 0,
-        rating: payload.rating ?? 0,
-        review_count: payload.review_count ?? 0,
-        image: payload.image ?? '',
-        image_alt: payload.image_alt ?? payload.name,
-        description: payload.description ?? '',
-        ingredients: payload.ingredients ?? [],
-        how_to_use: payload.how_to_use ?? '',
-        skin_type: payload.skin_type ?? [],
-        expiry_date: payload.expiry_date ?? '',
-        sku: payload.sku ?? '',
-        product_status: status,
-        tags: payload.tags ?? [],
-        weight: payload.weight ?? '',
-        origin: payload.origin ?? '',
-        is_deleted: false,
-        is_revoked: false,
-        gallery: payload.gallery ?? [],
-      };
-      const { data, error: e } = await supabase.from('products').insert(row).select('*').single();
-      if (e) return { ok: false as const, message: e.message };
-      await fetchProducts();
-      return { ok: true as const, product: normalizeProductRow(data as Record<string, unknown>) };
+      if (!payload.shop_id) return { ok: false as const, message: 'Shop required' };
+      try {
+        const created = await productsApi.createProduct(payload.shop_id, {
+          name: payload.name,
+          brand: payload.brand,
+          category: payload.category,
+          price: payload.price ?? 0,
+          originalPrice: payload.original_price ?? undefined,
+          stock: payload.stock ?? 0,
+          image: payload.image,
+          imageAlt: payload.image_alt,
+          description: payload.description,
+          sku: payload.sku,
+          status: 'ACTIVE',
+          visible: true,
+          tags: payload.tags,
+          weight: payload.weight,
+          origin: payload.origin,
+        });
+        await fetchProducts();
+        return { ok: true as const, product: apiToRow(created) };
+      } catch (e) {
+        return { ok: false as const, message: e instanceof Error ? e.message : 'Create failed' };
+      }
     },
     [fetchProducts]
   );
 
   const updateProduct = useCallback(
     async (id: string, patch: Partial<DbProductRow>) => {
-      const supabase = createClient();
-      const current = products.find((p) => p.id === id);
-      const merged = current ? { ...current, ...patch } : null;
-      const nextStatus =
-        merged && patch.product_status == null
-          ? computeProductStatus(merged.stock, merged.expiry_date)
-          : patch.product_status ?? merged?.product_status;
-
-      const { data, error: e } = await supabase
-        .from('products')
-        .update({
-          ...patch,
-          ...(patch.product_status == null && merged ? { product_status: nextStatus } : {}),
-        })
-        .eq('id', id)
-        .select('*')
-        .single();
-
-      if (e) return { ok: false as const, message: e.message };
-      const row = normalizeProductRow(data as Record<string, unknown>);
-      await syncInventoryStock(supabase, row);
-      await fetchProducts();
-      return { ok: true as const, product: row };
+      const sid = shopId || products.find((p) => p.id === id)?.shop_id;
+      if (!sid) return { ok: false as const, message: 'Shop required' };
+      try {
+        const updated = await productsApi.updateProduct(sid, id, rowToPayload(patch));
+        await fetchProducts();
+        return { ok: true as const, product: apiToRow(updated) };
+      } catch (e) {
+        return { ok: false as const, message: e instanceof Error ? e.message : 'Update failed' };
+      }
     },
-    [products, fetchProducts]
+    [shopId, products, fetchProducts]
   );
 
-  /** Soft delete (sets is_deleted). */
   const softDeleteProduct = useCallback(
     async (id: string) => {
-      return updateProduct(id, { is_deleted: true });
+      const sid = shopId;
+      if (!sid) return { ok: false as const, message: 'Shop required' };
+      try {
+        await productsApi.deleteProduct(sid, id);
+        await fetchProducts();
+        return { ok: true as const };
+      } catch (e) {
+        return { ok: false as const, message: e instanceof Error ? e.message : 'Delete failed' };
+      }
     },
+    [shopId, fetchProducts]
+  );
+
+  const restoreProduct = useCallback(
+    async (id: string) => updateProduct(id, { is_deleted: false, is_revoked: false }),
     [updateProduct]
   );
 
-  /** Admin restore: clear flags and recompute status from stock/expiry. */
-  const restoreProduct = useCallback(
-    async (id: string) => {
-      const p = products.find((x) => x.id === id);
-      if (!p) return { ok: false as const, message: 'Product not found' };
-      const status = computeProductStatus(p.stock, p.expiry_date);
-      return updateProduct(id, {
-        is_deleted: false,
-        is_revoked: false,
-        product_status: status,
-      });
-    },
-    [products, updateProduct]
-  );
-
   const setRevoked = useCallback(
-    async (id: string, revoked: boolean) => {
-      return updateProduct(id, { is_revoked: revoked });
-    },
+    async (id: string, revoked: boolean) => updateProduct(id, { is_revoked: revoked }),
     [updateProduct]
   );
 
   const markExpired = useCallback(
-    async (id: string) => {
-      return updateProduct(id, { product_status: 'expired' });
-    },
+    async (id: string) => updateProduct(id, { product_status: 'expired' }),
     [updateProduct]
   );
 
-  /** Purchase from supplier: positive qty increases stock and logs an event. */
   const recordStockPurchase = useCallback(
     async (opts: {
       productId: string;
@@ -405,43 +331,45 @@ export function useShopProductManagement(shopId: string | undefined) {
     }) => {
       const { productId, quantityReceived, supplierName, note, actorRole } = opts;
       if (!shopId || quantityReceived <= 0) return { ok: false as const, message: 'Invalid quantity' };
-      const supabase = createClient();
       const p = products.find((x) => x.id === productId);
       if (!p) return { ok: false as const, message: 'Product not found' };
 
       const newStock = p.stock + quantityReceived;
-      const status = computeProductStatus(newStock, p.expiry_date);
+      const res = await updateProduct(productId, { stock: newStock });
+      if (!res.ok) return res;
 
-      const { error: evErr } = await supabase.from('product_stock_events').insert({
-        product_id: productId,
-        shop_id: shopId,
-        quantity_received: quantityReceived,
-        supplier_name: supplierName,
-        note,
-        recorded_by_role: actorRole,
-      });
-      if (evErr) return { ok: false as const, message: evErr.message };
+      setStockEvents((prev) => [
+        {
+          id: `evt-${Date.now()}`,
+          product_id: productId,
+          shop_id: shopId,
+          quantity_received: quantityReceived,
+          supplier_name: supplierName,
+          note,
+          recorded_by_role: actorRole,
+          created_at: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
 
-      const { error: upErr } = await supabase
-        .from('products')
-        .update({ stock: newStock, product_status: status })
-        .eq('id', productId);
-      if (upErr) return { ok: false as const, message: upErr.message };
+      try {
+        const inv = await inventoryApi.listInventory(shopId, { search: p.sku, limit: 5 });
+        const item = inv.content?.find((i) => i.productId === productId || i.sku === p.sku);
+        if (item?.id) await inventoryApi.restock(item.id, quantityReceived);
+      } catch {
+        // inventory sync is best-effort
+      }
 
-      await syncInventoryStock(supabase, { ...p, stock: newStock });
-      await fetchProducts();
-      await fetchStockEvents();
       return { ok: true as const };
     },
-    [shopId, products, fetchProducts, fetchStockEvents]
+    [shopId, products, updateProduct]
   );
 
   const appendGalleryUrls = useCallback(
     async (productId: string, urls: string[]) => {
       const p = products.find((x) => x.id === productId);
       if (!p || urls.length === 0) return { ok: false as const, message: 'Nothing to add' };
-      const gallery = [...(p.gallery || []), ...urls];
-      return updateProduct(productId, { gallery });
+      return updateProduct(productId, { gallery: [...(p.gallery || []), ...urls] });
     },
     [products, updateProduct]
   );
@@ -456,9 +384,9 @@ export function useShopProductManagement(shopId: string | undefined) {
     loading,
     error,
     refetch: fetchProducts,
-    refetchCategories: fetchCategories,
-    refetchBrands: fetchBrands,
-    refetchStockEvents: fetchStockEvents,
+    refetchCategories: fetchProducts,
+    refetchBrands: fetchProducts,
+    refetchStockEvents: async () => {},
     insertProduct,
     updateProduct,
     softDeleteProduct,

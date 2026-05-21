@@ -4,9 +4,8 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
-import { MOCK_REVIEWS } from '@/lib/mock/data';
 import type { Product, Review } from '@/lib/mock/data';
-import { getProduct, listCatalog } from '@/lib/api/services/products';
+import { getProduct, listCatalog, getReviews, submitReview } from '@/lib/api/services/products';
 import { mapApiProductToMock } from '@/lib/api/mappers';
 import type { ApiProduct } from '@/lib/api/types';
 import { useCart } from '@/contexts/CartContext';
@@ -54,7 +53,25 @@ export default function ProductDetailClient({ productId }: { productId: string }
         setProduct(mapped);
         setSelectedImage(0);
         setQuantity(1);
-        setLocalReviews(MOCK_REVIEWS.filter((r) => r.productId === mapped.id));
+        try {
+          const reviewsPage = await getReviews(productId);
+          setLocalReviews(
+            (reviewsPage.content || []).map((r) => ({
+              id: String(r.id || ''),
+              productId: mapped.id,
+              userName: String(r.userName || 'Customer'),
+              rating: Number(r.rating) || 5,
+              title: String(r.title || ''),
+              body: String(r.body || ''),
+              skinType: String(r.skinType || ''),
+              date: String(r.createdAt || new Date().toISOString()),
+              helpful: 0,
+              verified: true,
+            }))
+          );
+        } catch {
+          setLocalReviews([]);
+        }
 
         const relatedPage = await listCatalog({
           category: apiProduct.category,
@@ -108,31 +125,39 @@ export default function ProductDetailClient({ productId }: { productId: string }
     }
   };
 
-  const handleSubmitReview = (e: React.FormEvent) => {
+  const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!product) return;
-    const newReview = {
-      id: `rev-new-${Date.now()}`,
-      productId: product.id,
-      customerId: 'usr-005',
-      customerName: 'Emma Rodriguez',
-      customerAvatar: "https://img.rocket.new/generatedImages/rocket_gen_img_1bdb060e2-1778572113176.png",
-      customerAvatarAlt: 'Customer Emma Rodriguez',
+    try {
+    await submitReview(product.id, {
       rating: reviewForm.rating,
       title: reviewForm.title,
       body: reviewForm.body,
-      photos: reviewForm.photoPreview ? [reviewForm.photoPreview] : [],
-      verified: true,
-      helpful: 0,
-      createdAt: 'Just now',
-      skinType: reviewForm.skinType
-    };
-    setLocalReviews((prev) => [newReview as Review, ...prev]);
+      skinType: reviewForm.skinType || undefined,
+    });
+    const reviewsPage = await getReviews(product.id);
+    setLocalReviews(
+      (reviewsPage.content || []).map((r) => ({
+        id: String(r.id || ''),
+        productId: product.id,
+        userName: String(r.userName || 'Customer'),
+        rating: Number(r.rating) || 5,
+        title: String(r.title || ''),
+        body: String(r.body || ''),
+        skinType: String(r.skinType || ''),
+        date: String(r.createdAt || new Date().toISOString()),
+        helpful: 0,
+        verified: true,
+      }))
+    );
     setReviewSubmitted(true);
     setShowReviewForm(false);
     setReviewForm({ rating: 5, title: '', body: '', skinType: '', photoPreview: null });
     setTimeout(() => setReviewSubmitted(false), 4000);
     setActiveTab('reviews');
+    } catch {
+      // keep form open on failure
+    }
   };
 
   if (loading) {

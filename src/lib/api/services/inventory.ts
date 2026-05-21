@@ -10,9 +10,23 @@ export function listInventory(shopId: string, params?: { status?: string; search
   return apiFetch<PageData<ApiInventoryItem>>(`/inventory?${q}`);
 }
 
+export function createItem(shopId: string, body: Record<string, unknown>) {
+  return apiFetch<ApiInventoryItem>(`/inventory?shopId=${shopId}`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 export function restock(id: string, quantity: number) {
   return apiFetch<ApiInventoryItem>(`/inventory/${id}/restock`, {
     method: 'PATCH',
     body: JSON.stringify({ quantity }),
+  });
+}
+
+export function adjustStock(id: string, delta: number, notes?: string) {
+  return apiFetch<ApiInventoryItem>(`/inventory/${id}/adjust`, {
+    method: 'PATCH',
+    body: JSON.stringify({ delta, notes }),
   });
 }

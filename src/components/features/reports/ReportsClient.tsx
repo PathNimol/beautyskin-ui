@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
-import { REVENUE_DATA, WEEKLY_SALES_DATA, MOCK_PRODUCTS } from '@/lib/mock/data';
+import { REVENUE_DATA, WEEKLY_SALES_DATA } from '@/lib/mock/data';
+import { useAnalyticsSummary } from '@/hooks/useApiLists';
+import { productsApi } from '@/lib/api';
+import { useMockAuth } from '@/contexts/MockAuthContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 type Period = 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -35,8 +38,23 @@ function exportCSV(filename: string, headers: string[], rows: (string | number)[
 
 export default function ReportsClient() {
   const [period, setPeriod] = useState<Period>('monthly');
+  const { user } = useMockAuth();
+  const { data: analyticsData } = useAnalyticsSummary(period === 'daily' ? '7d' : '30d');
+  const [topProducts, setTopProducts] = useState<{ name: string; sold: number }[]>([]);
 
-  const topProducts = MOCK_PRODUCTS.sort((a, b) => b.sold - a.sold).slice(0, 5);
+  useEffect(() => {
+    if (!user?.shopId) return;
+    productsApi.listMerchant(user.shopId, { limit: 20 }).then((p) => {
+      setTopProducts(
+        (p.content || [])
+          .map((x) => ({ name: x.name, sold: Number(x.sold) || 0 }))
+          .sort((a, b) => b.sold - a.sold)
+          .slice(0, 5)
+      );
+    }).catch(() => {});
+  }, [user?.shopId]);
+
+  const apiRevenue = analyticsData?.totalRevenue != null ? Number(analyticsData.totalRevenue) : null;
   const totalRevenue = REVENUE_DATA.reduce((sum, d) => sum + d.revenue, 0);
   const totalOrders = REVENUE_DATA.reduce((sum, d) => sum + d.orders, 0);
   const avgOrderValue = totalRevenue / totalOrders;

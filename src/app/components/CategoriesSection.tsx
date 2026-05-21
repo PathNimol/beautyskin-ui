@@ -106,9 +106,8 @@ export default function CategoriesSection() {
               <span className="text-primary"> Ritual.</span>
             </h2>
           </div>
-          {/* "All Categories" link → login */}
           <Link
-            href="/login"
+            href="/product-listing"
             className="flex items-center gap-2 text-sm font-semibold text-accent hover:text-gold-deep transition-colors group self-start md:self-auto">
             
             All Categories

@@ -1,37 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-// Public routes that don't require authentication
-const PUBLIC_ROUTES = [
-  '/',
-  '/login',
-  '/register',
-  '/forgot-password',
-  '/product-listing',
-  '/cart',
-  '/checkout',
-  '/customer/products',
-  '/customer/shop',
-  '/customer/cart',
-  '/customer/checkout',
-];
+import { isPublicRoute } from '@/lib/auth/publicRoutes';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public routes
-  if (
-    PUBLIC_ROUTES.includes(pathname) ||
-    pathname.startsWith('/product-detail/')
-  ) {
-    return NextResponse.next();
-  }
-
-  /** Allow nested customer storefront routes (e.g. future dynamic segments). */
-  if (
-    pathname.startsWith('/customer/products/') ||
-    pathname.startsWith('/customer/shop/')
-  ) {
+  // Storefront and auth pages — no login required
+  if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
 
@@ -46,7 +21,6 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for session cookie (set by MockAuthContext on login)
   const sessionCookie = request.cookies.get('bs_session');
 
   if (!sessionCookie?.value) {
@@ -59,7 +33,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|assets).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|assets).*)'],
 };

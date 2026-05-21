@@ -52,3 +52,21 @@ export function submitReview(productId: string, body: { rating: number; title: s
     body: JSON.stringify(body),
   });
 }
+
+export function createProduct(shopId: string, body: Record<string, unknown>) {
+  return apiFetch<ApiProduct>(`/products/shops/${shopId}`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateProduct(shopId: string, productId: string, body: Record<string, unknown>) {
+  return apiFetch<ApiProduct>(`/products/shops/${shopId}/${productId}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteProduct(shopId: string, productId: string) {
+  return apiFetch<void>(`/products/shops/${shopId}/${productId}`, { method: 'DELETE' });
+}

@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
-import { MOCK_PROMOTIONS } from '@/lib/mock/data';
+import { usePromotionsList } from '@/hooks/useApiLists';
+import { promotionsApi } from '@/lib/api';
+import { useMockAuth } from '@/contexts/MockAuthContext';
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
   active: { bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500' },
@@ -20,7 +22,22 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function PromotionsClient() {
-  const [promotions, setPromotions] = useState(MOCK_PROMOTIONS);
+  const { user } = useMockAuth();
+  const { promotions: apiPromos, refetch } = usePromotionsList();
+  const promotions = apiPromos.map((p) => ({
+    id: p.id,
+    name: p.name,
+    code: p.code,
+    type: p.type?.toLowerCase() || 'percentage',
+    value: p.value,
+    minOrder: p.minOrder ?? 0,
+    maxUses: p.maxUses ?? 0,
+    usedCount: p.usedCount ?? 0,
+    startDate: p.startDate || '',
+    endDate: p.endDate || '',
+    status: (p.status || 'active').toLowerCase(),
+    description: p.description || '',
+  }));
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showCreateModal, setShowCreateModal] = useState(false);

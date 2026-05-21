@@ -6,8 +6,8 @@ import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { useRealtimeOrders, useRealtimeInventory, useRealtimeShops } from '@/hooks/useRealtimeData';
-import { MOCK_PRODUCTS, MOCK_SUPPLIERS } from '@/lib/mock/data';
-import { createClient } from '@/lib/supabase/client';
+import { useShopDashboard } from '@/hooks/useApiLists';
+import { supplierPurchasesApi } from '@/lib/api';
 import {
   BarChart,
   Bar,
@@ -104,7 +104,7 @@ function KPICard({
 
 export default function DashboardClient() {
   const { role, user } = useMockAuth();
-  const supabase = createClient();
+  const { data: shopDash } = useShopDashboard();
   const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'shops'>('overview');
   const [purchasesTotal, setPurchasesTotal] = useState(0);
 
@@ -116,19 +116,18 @@ export default function DashboardClient() {
 
   const fetchPurchasesTotal = useCallback(async () => {
     try {
-      const { data } = await supabase
-        .from('supplier_purchases')
-        .select('total_amount')
-        .eq('status', 'received');
-      if (data) setPurchasesTotal(data.reduce((s, r) => s + Number(r.total_amount), 0));
+      const page = await supplierPurchasesApi.list(user?.shopId, { status: 'RECEIVED' });
+      setPurchasesTotal((page.content || []).reduce((s, r) => s + Number(r.total || 0), 0));
     } catch {
       /* ignore */
     }
-  }, [supabase]);
+  }, [user?.shopId]);
 
   useEffect(() => {
     fetchPurchasesTotal();
   }, [fetchPurchasesTotal]);
+
+  const dashRevenue = shopDash?.revenue != null ? Number(shopDash.revenue) : null;
 
   const liveRevenue = orders
     .filter((o) => o.pay_status === 'Paid')
@@ -183,7 +182,7 @@ export default function DashboardClient() {
     },
     {
       label: 'Total Products',
-      value: MOCK_PRODUCTS.length.toLocaleString(),
+      value: String(shopDash?.products ?? inventory.length),
       change: `${liveLowStock} low stock`,
       positive: liveLowStock === 0,
       icon: 'ArchiveBoxIcon',
@@ -201,7 +200,7 @@ export default function DashboardClient() {
     },
     {
       label: 'Total Suppliers',
-      value: MOCK_SUPPLIERS.length.toLocaleString(),
+      value: purchasesTotal > 0 ? `$${(purchasesTotal / 1000).toFixed(1)}K` : '—',
       change: 'Active',
       positive: true,
       icon: 'TruckIcon',
@@ -250,7 +249,7 @@ export default function DashboardClient() {
     },
     {
       label: 'Products',
-      value: MOCK_PRODUCTS.filter((p) => p.shopId === user?.shopId).length.toLocaleString(),
+      value: String(shopDash?.products ?? '—'),
       change: `${liveLowStock} alerts`,
       positive: liveLowStock === 0,
       icon: 'ArchiveBoxIcon',

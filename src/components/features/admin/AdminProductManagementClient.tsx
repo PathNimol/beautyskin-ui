@@ -12,7 +12,6 @@ import {
   useShopProductManagement,
   type DbProductRow,
 } from '@/hooks/useShopProductManagement';
-import { createClient } from '@/lib/supabase/client';
 
 type VisibilityFilter = 'all' | 'listed' | 'attention';
 
@@ -39,19 +38,13 @@ function splitList(s: string): string[] {
     .filter(Boolean);
 }
 
-async function tryUploadProductImage(file: File, shopId: string): Promise<{ url: string | null; error?: string }> {
-  const supabase = createClient();
-  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const path = `${shopId}/${Date.now()}-${safe}`;
-  const { error } = await supabase.storage.from('product-images').upload(path, file, {
-    cacheControl: '3600',
-    upsert: false,
+async function tryUploadProductImage(file: File, _shopId: string): Promise<{ url: string | null; error?: string }> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ url: reader.result as string });
+    reader.onerror = () => resolve({ url: null, error: 'Failed to read image' });
+    reader.readAsDataURL(file);
   });
-  if (error) {
-    return { url: null, error: error.message };
-  }
-  const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-  return { url: data.publicUrl };
 }
 
 type FormState = {

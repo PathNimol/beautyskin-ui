@@ -17,6 +17,10 @@ export function updateShopStatus(id: string, status: string) {
   });
 }
 
+export function getShop(id: string) {
+  return apiFetch<ApiShop>(`/shops/${id}`);
+}
+
 export function createShop(body: Record<string, unknown>) {
   return apiFetch<ApiShop>('/shops', {
     method: 'POST',

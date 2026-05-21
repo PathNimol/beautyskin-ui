@@ -6,6 +6,7 @@ import {
   ordersApi,
   shopsApi,
   notificationsApi,
+  shopStaffApi,
   mapApiInventory,
   mapApiOrder,
   mapApiShop,
@@ -283,17 +284,7 @@ export function useRealtimeStaff(shopId?: string) {
     }
     setLoading(true);
     try {
-      const { apiFetch } = await import('@/lib/api/client');
-      const page = await apiFetch<{ content: Array<{
-        id: string;
-        name: string;
-        email: string;
-        phone?: string;
-        role: string;
-        status: string;
-        shop?: { id: string };
-        createdAt?: string;
-      }> }>(`/shops/${shopId}/users?limit=100`);
+      const page = await shopStaffApi.list(shopId, { limit: 100 });
       setStaff(
         page.content.map((u) => ({
           id: u.id,
@@ -317,11 +308,54 @@ export function useRealtimeStaff(shopId?: string) {
   }, [shopId]);
 
   const batchInsertStaff = useCallback(
-    async (_rows: unknown[]) => ({ inserted: 0, errors: [] as string[] }),
-    []
+    async (rows: Array<{ name: string; email: string; phone?: string; role: string }>) => {
+      if (!shopId) return { inserted: 0, errors: ['No shop'] as string[] };
+      const errors: string[] = [];
+      let inserted = 0;
+      for (const row of rows) {
+        try {
+          await shopStaffApi.create(shopId, {
+            name: row.name,
+            email: row.email,
+            phone: row.phone,
+            role: row.role.toUpperCase(),
+          });
+          inserted++;
+        } catch (e) {
+          errors.push(e instanceof Error ? e.message : 'Insert failed');
+        }
+      }
+      await fetchStaff();
+      return { inserted, errors };
+    },
+    [shopId, fetchStaff]
   );
-  const removeStaffMember = useCallback(async (_staffId: string) => true, []);
-  const updateStaffRole = useCallback(async (_staffId: string, _role: DbStaff['role']) => true, []);
+  const removeStaffMember = useCallback(
+    async (staffId: string) => {
+      if (!shopId) return false;
+      try {
+        await shopStaffApi.remove(shopId, staffId);
+        await fetchStaff();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [shopId, fetchStaff]
+  );
+  const updateStaffRole = useCallback(
+    async (staffId: string, role: DbStaff['role']) => {
+      if (!shopId) return false;
+      try {
+        await shopStaffApi.update(shopId, staffId, { role: role.toUpperCase() });
+        await fetchStaff();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [shopId, fetchStaff]
+  );
 
   useEffect(() => {
     fetchStaff();
@@ -359,9 +393,14 @@ export function useRealtimeNotifications(shopId?: string) {
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    await Promise.all(notifications.filter((n) => !n.is_read).map((n) => notificationsApi.markRead(n.id)));
+    await notificationsApi.markAllRead();
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-  }, [notifications]);
+  }, []);
+
+  const deleteNotification = useCallback(async (notifId: string) => {
+    await notificationsApi.deleteNotification(notifId);
+    setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+  }, []);
 
   const dismissToast = useCallback((notifId: string) => {
     setToastQueue((prev) => prev.filter((n) => n.id !== notifId));
@@ -375,5 +414,15 @@ export function useRealtimeNotifications(shopId?: string) {
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  return { notifications, loading, unreadCount, toastQueue, markAsRead, markAllAsRead, dismissToast, refetch: fetchNotifications };
+  return {
+    notifications,
+    loading,
+    unreadCount,
+    toastQueue,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    dismissToast,
+    refetch: fetchNotifications,
+  };
 }

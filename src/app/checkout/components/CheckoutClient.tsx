@@ -5,6 +5,8 @@ import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { useCart } from '@/contexts/CartContext';
+import { checkoutApi, ordersApi } from '@/lib/api';
+import type { CheckoutQuote } from '@/lib/api/types';
 
 
 const COUNTRIES = ['United States', 'Cambodia', 'Thailand', 'Singapore', 'Malaysia', 'Vietnam', 'Philippines', 'Indonesia', 'Japan', 'South Korea'];
@@ -30,8 +32,8 @@ interface FormData {
 export default function CheckoutClient({ embedded = false }: { embedded?: boolean }) {
   const shopHref = embedded ? '/customer/products' : '/product-listing';
   const cartHref = embedded ? '/customer/cart' : '/cart';
-  const { user, updateProfile } = useMockAuth();
-  const { items: cartItems, clearCart, subtotal: cartSubtotal } = useCart();
+  const { user, updateProfile, isAuthenticated } = useMockAuth();
+  const { items: cartItems, clearCart, subtotal: cartSubtotal, discount: cartDiscount, refreshCart } = useCart();
   const orderItems = cartItems.map((i) => ({
     id: i.id,
     name: i.name,
@@ -44,6 +46,9 @@ export default function CheckoutClient({ embedded = false }: { embedded?: boolea
 
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [placedOrderRef, setPlacedOrderRef] = useState('');
+  const [quote, setQuote] = useState<CheckoutQuote | null>(null);
   const [activeStep, setActiveStep] = useState<'shipping' | 'payment'>('shipping');
   const [form, setForm] = useState<FormData>({
     firstName: '', lastName: '', email: '', phone: '',
@@ -72,36 +77,69 @@ export default function CheckoutClient({ embedded = false }: { embedded?: boolea
     }));
   }, [user]);
 
-  const subtotal = orderItems.length > 0
-    ? cartSubtotal
-    : 0;
-  const shipping = 0;
-  const discount = subtotal * 0.10;
-  const total = subtotal - discount + shipping;
-
-  const orderNumber = `#ORD-${Math.floor(3000 + Math.random() * 1000)}`;
-
-  const handlePlaceOrder = () => {
-    setLoading(true);
-    if (form.saveInfo && user) {
-      updateProfile({
-        phone: form.phone,
-        shipping: {
-          firstName: form.firstName,
-          lastName: form.lastName,
-          address: form.address,
-          city: form.city,
-          state: form.state,
-          zip: form.zip,
-          country: form.country,
-        },
-      });
+  useEffect(() => {
+    if (!isAuthenticated || orderItems.length === 0) {
+      setQuote(null);
+      return;
     }
-    setTimeout(() => {
-      setLoading(false);
+    let cancelled = false;
+    checkoutApi.getQuote()
+      .then((q) => { if (!cancelled) setQuote(q); })
+      .catch(() => { if (!cancelled) setQuote(null); });
+    return () => { cancelled = true; };
+  }, [isAuthenticated, orderItems.length, cartSubtotal, cartDiscount]);
+
+  const subtotal = quote ? Number(quote.subtotal) : (orderItems.length > 0 ? cartSubtotal : 0);
+  const promoDiscount = quote ? Number(quote.promoDiscount) : cartDiscount;
+  const autoDiscount = quote ? Number(quote.autoDiscount) : subtotal * 0.10;
+  const shipping = quote ? Number(quote.shipping) : 0;
+  const total = quote ? Number(quote.total) : Math.max(0, subtotal - promoDiscount - autoDiscount + shipping);
+
+  const handlePlaceOrder = async () => {
+    if (orderItems.length === 0) {
+      setError('Your cart is empty.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      if (form.saveInfo && user) {
+        updateProfile({
+          phone: form.phone,
+          shipping: {
+            firstName: form.firstName,
+            lastName: form.lastName,
+            address: form.address,
+            city: form.city,
+            state: form.state,
+            zip: form.zip,
+            country: form.country,
+          },
+        });
+      }
+      const result = await ordersApi.placeOrder({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email || user?.email || '',
+        phone: form.phone,
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        zip: form.zip,
+        country: form.country,
+        paymentMethod: form.paymentMethod === 'qr' ? 'QR' : 'CARD',
+        saveInfo: form.saveInfo,
+      });
+      const first = result.orders?.[0];
+      setPlacedOrderRef(first?.orderRef ? `#${first.orderRef}` : first?.id ? `#${first.id.slice(0, 8)}` : '');
+      await clearCart();
+      await refreshCart();
       setConfirmed(true);
-      clearCart();
-    }, 1500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to place order');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fieldPlaceholder = (field: keyof FormData, label: string) => {
@@ -139,7 +177,7 @@ export default function CheckoutClient({ embedded = false }: { embedded?: boolea
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-xs text-muted-foreground">Order Number</p>
-                <p className="font-bold text-foreground font-mono">{orderNumber}</p>
+                <p className="font-bold text-foreground font-mono">{placedOrderRef || '—'}</p>
               </div>
               <span className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg border border-green-200">Confirmed</span>
             </div>
@@ -178,10 +216,18 @@ export default function CheckoutClient({ embedded = false }: { embedded?: boolea
               <span className="text-muted-foreground">Subtotal</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
+            {promoDiscount > 0 && (
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-green-600">Promo (BEAUTY10)</span>
-              <span className="text-green-600">-${discount.toFixed(2)}</span>
+              <span className="text-green-600">Promo discount</span>
+              <span className="text-green-600">-${promoDiscount.toFixed(2)}</span>
             </div>
+            )}
+            {autoDiscount > 0 && (
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-green-600">Auto discount (10%)</span>
+              <span className="text-green-600">-${autoDiscount.toFixed(2)}</span>
+            </div>
+            )}
             <div className="flex justify-between text-sm mb-1">
               <span className="text-muted-foreground">Shipping</span>
               <span className="text-green-600">FREE</span>
@@ -384,9 +430,12 @@ export default function CheckoutClient({ embedded = false }: { embedded?: boolea
                   <Icon name="ArrowLeftIcon" size={16} />
                   Back
                 </button>
+                {error && (
+                  <p className="text-sm text-red-600 mb-3">{error}</p>
+                )}
                 <button
                 onClick={handlePlaceOrder}
-                disabled={loading}
+                disabled={loading || orderItems.length === 0}
                 className="flex-1 py-3.5 bg-primary text-foreground font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose disabled:opacity-60 flex items-center justify-center gap-2 text-sm">
                 
                   {loading ?
@@ -429,10 +478,18 @@ export default function CheckoutClient({ embedded = false }: { embedded?: boolea
               <span className="text-muted-foreground">Subtotal</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
+            {promoDiscount > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-green-600">Promo (BEAUTY10)</span>
-              <span className="text-green-600">-${discount.toFixed(2)}</span>
+              <span className="text-green-600">Promo discount</span>
+              <span className="text-green-600">-${promoDiscount.toFixed(2)}</span>
             </div>
+            )}
+            {autoDiscount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-green-600">Auto discount (10%)</span>
+              <span className="text-green-600">-${autoDiscount.toFixed(2)}</span>
+            </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Shipping</span>
               <span className="text-green-600">FREE</span>

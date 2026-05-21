@@ -4,27 +4,33 @@ import React, { useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
-import { MOCK_SUPPLIERS } from '@/lib/mock/data';
+import { useSuppliersList } from '@/hooks/useApiLists';
+import type { ApiSupplier } from '@/lib/api/types';
 
 export default function SuppliersClient() {
   const [search, setSearch] = useState('');
-  const [selectedSupplier, setSelectedSupplier] = useState<typeof MOCK_SUPPLIERS[0] | null>(null);
+  const { suppliers, loading } = useSuppliersList(search);
+  const [selectedSupplier, setSelectedSupplier] = useState<ApiSupplier | null>(null);
 
-  const filtered = MOCK_SUPPLIERS.filter(s =>
+  const filtered = suppliers.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.contactPerson.toLowerCase().includes(search.toLowerCase()) ||
-    s.country.toLowerCase().includes(search.toLowerCase())
+    (s.contactPerson || '').toLowerCase().includes(search.toLowerCase()) ||
+    (s.country || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  const activeCount = suppliers.filter((s) => (s.status || '').toLowerCase() === 'active').length;
+  const totalSpent = suppliers.reduce((sum, s) => sum + (s.totalSpent || 0), 0);
+  const totalOrders = suppliers.reduce((sum, s) => sum + (s.totalOrders || 0), 0);
+
   return (
-    <DashboardLayout title="Suppliers" subtitle={`${MOCK_SUPPLIERS.length} registered suppliers`}>
+    <DashboardLayout title="Suppliers" subtitle={loading ? 'Loading…' : `${suppliers.length} registered suppliers`}>
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Total Suppliers', value: MOCK_SUPPLIERS.length, icon: 'TruckIcon', color: 'bg-blue-50 text-blue-600' },
-          { label: 'Active', value: MOCK_SUPPLIERS.filter(s => s.status === 'active').length, icon: 'CheckCircleIcon', color: 'bg-green-50 text-green-600' },
-          { label: 'Total Spent', value: `$${(MOCK_SUPPLIERS.reduce((sum, s) => sum + s.totalSpent, 0) / 1000).toFixed(0)}K`, icon: 'CurrencyDollarIcon', color: 'bg-primary/20 text-rose-deep' },
-          { label: 'Total Orders', value: MOCK_SUPPLIERS.reduce((sum, s) => sum + s.totalOrders, 0), icon: 'ClipboardDocumentListIcon', color: 'bg-accent/20 text-gold-deep' },
+          { label: 'Total Suppliers', value: suppliers.length, icon: 'TruckIcon', color: 'bg-blue-50 text-blue-600' },
+          { label: 'Active', value: activeCount, icon: 'CheckCircleIcon', color: 'bg-green-50 text-green-600' },
+          { label: 'Total Spent', value: `$${(totalSpent / 1000).toFixed(0)}K`, icon: 'CurrencyDollarIcon', color: 'bg-primary/20 text-rose-deep' },
+          { label: 'Total Orders', value: totalOrders, icon: 'ClipboardDocumentListIcon', color: 'bg-accent/20 text-gold-deep' },
         ].map(stat => (
           <div key={stat.label} className="bg-card border border-border rounded-2xl p-4 shadow-card">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${stat.color}`}>

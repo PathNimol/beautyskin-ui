@@ -2,14 +2,14 @@
 // src/app/customers/CustomersClient.tsx
 // Fixed imports: @/types/userManagement, @/components/UserFormModal, etc.
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Icon from '@/components/ui/AppIcon';
 import {
-  MOCK_CUSTOMERS,
   STATUS_STYLES,
   type ManagedUser,
   type UserStatus,
 } from '@/types/userManagement';
+import { customersApi } from '@/lib/api';
 import UserFormModal from '@/components/UserFormModel';
 import ActivityDrawer from '@/components/ActivityDrawer';
 import ConfirmModal from '@/components/ConfirmModel';
@@ -149,8 +149,32 @@ function ResetPasswordModal({
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
+function mapApiCustomer(u: { id: string; email: string; fullName?: string; name?: string; firstName?: string; lastName?: string; role?: string; phone?: string; joinDate?: string }): ManagedUser {
+  const first = u.firstName || (u.fullName || u.name || '').split(' ')[0] || '';
+  const last = u.lastName || (u.fullName || u.name || '').split(' ').slice(1).join(' ') || '';
+  return {
+    id: u.id,
+    firstName: first,
+    lastName: last,
+    email: u.email,
+    phone: u.phone || '',
+    role: 'customer',
+    status: 'active',
+    joinDate: u.joinDate || new Date().toISOString(),
+    lastActive: new Date().toISOString(),
+    orders: 0,
+    totalSpent: 0,
+  };
+}
+
 export default function CustomersClient() {
-  const [users, setUsers] = useState<ManagedUser[]>(MOCK_CUSTOMERS);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+
+  useEffect(() => {
+    customersApi.listCustomers({ limit: 200 })
+      .then((page) => setUsers((page.content || []).map(mapApiCustomer)))
+      .catch(() => setUsers([]));
+  }, []);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
 

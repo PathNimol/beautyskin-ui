@@ -1,6 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
+import { isPublicRoute } from '@/lib/auth/publicRoutes';
 import { authApi, mapApiUserToMock, saveAuthTokens, clearAuthTokens, ApiError } from '@/lib/api';
 import type { TokenPayload } from '@/lib/api/services/auth';
 import type { RegisterPendingResponse } from '@/lib/api/types';
@@ -69,14 +71,17 @@ function persistSession(user: MockUser, tokens: { accessToken: string; refreshTo
 }
 
 export const MockAuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const pathname = usePathname();
   const [user, setUser] = useState<MockUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadSession = useCallback(async () => {
+  const loadSession = useCallback(async (options?: { blockUi?: boolean }) => {
+    const blockUi = options?.blockUi ?? true;
+    if (blockUi) setLoading(true);
     try {
       const tokensRaw = localStorage.getItem(TOKEN_KEY);
       if (!tokensRaw) {
-        setLoading(false);
+        setUser(null);
         return;
       }
       const apiUser = await authApi.getMe();
@@ -90,13 +95,30 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
       deleteCookie('bs_session');
       setUser(null);
     } finally {
-      setLoading(false);
+      if (blockUi) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadSession();
-  }, [loadSession]);
+    const isPublic = isPublicRoute(pathname);
+    const hasTokens =
+      typeof window !== 'undefined' && !!localStorage.getItem(TOKEN_KEY);
+
+    // Guests on home/storefront: render immediately without waiting on auth API
+    if (isPublic && !hasTokens) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
+    if (isPublic && hasTokens) {
+      setLoading(false);
+      void loadSession({ blockUi: false });
+      return;
+    }
+
+    void loadSession({ blockUi: true });
+  }, [pathname, loadSession]);
 
   const establishFromTokenPayload = useCallback((res: TokenPayload): MockUser => {
     const normalized = normalizeUser(mapApiUserToMock(res.user));

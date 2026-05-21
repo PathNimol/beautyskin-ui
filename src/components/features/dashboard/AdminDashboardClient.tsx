@@ -19,7 +19,9 @@ import {
   Cell,
 } from 'recharts';
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+import { useAdminDashboard } from '@/hooks/useApiLists';
+
+// ─── Mock Data (charts fallback) ────────────────────────────────────────────────
 
 const revenueData = [
   { month: 'Jan', revenue: 4200, orders: 87 },
@@ -309,6 +311,15 @@ function ExportButtons({ onPDF, onExcel }: { onPDF: () => void; onExcel: () => v
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdminDashboardClient() {
+  const { data: adminData, loading: adminLoading } = useAdminDashboard();
+  const apiRecentOrders = Array.isArray(adminData?.recentOrders) ? adminData.recentOrders : [];
+  const apiKpis = {
+    totalShops: Number(adminData?.totalShops) || 0,
+    totalOrders: Number(adminData?.totalOrders) || 0,
+    totalProducts: Number(adminData?.totalProducts) || 0,
+    totalCustomers: Number(adminData?.totalCustomers) || 0,
+    pendingOrders: Number(adminData?.pendingOrders) || 0,
+  };
   const [notifOpen, setNotifOpen] = useState(false);
   const [chartPeriod, setChartPeriod] = useState<'weekly' | 'monthly'>('monthly');
   const [activeTab, setActiveTab] = useState<'orders' | 'expired'>('orders');

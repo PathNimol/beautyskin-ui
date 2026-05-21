@@ -7,7 +7,7 @@ import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import StaffManagementModal from '@/components/StaffManagementModal';
 import { useRealtimeShops } from '@/hooks/useRealtimeData';
-import { createClient } from '@/lib/supabase/client';
+import { shopsApi } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ShopStatus = 'active' | 'pending' | 'suspended';
@@ -57,27 +57,26 @@ export default function ShopManagementClient() {
   const handleAddShop = async () => {
     if (!newShop.name || !newShop.owner_name) return;
     setAddingShop(true);
-    const supabase = createClient();
     const slug = newShop.name
       .toLowerCase()
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '');
-    const { error } = await supabase.from('shops').insert({
-      name: newShop.name,
-      slug: `${slug}-${Date.now()}`,
-      owner_name: newShop.owner_name,
-      description: newShop.description,
-      category: newShop.category,
-      shop_status: 'pending',
-      plan: 'starter',
-      logo: 'https://img.rocket.new/generatedImages/rocket_gen_img_1c6599022-1772541113609.png',
-      logo_alt: `${newShop.name} shop logo`,
-    });
-    setAddingShop(false);
-    if (error) {
-      showToast('Failed to register shop: ' + error.message);
+    try {
+      await shopsApi.createShop({
+        name: newShop.name,
+        slug: `${slug}-${Date.now()}`,
+        ownerName: newShop.owner_name,
+        description: newShop.description,
+        category: newShop.category,
+        status: 'PENDING',
+        plan: 'STARTER',
+      });
+    } catch (e) {
+      setAddingShop(false);
+      showToast('Failed to register shop: ' + (e instanceof Error ? e.message : 'Error'));
       return;
     }
+    setAddingShop(false);
     showToast(`${newShop.name} registered successfully.`);
     setNewShop({ name: '', owner_name: '', description: '', category: '' });
     setShowAddShop(false);
@@ -85,8 +84,7 @@ export default function ShopManagementClient() {
   };
 
   const updateShopStatus = async (shopId: string, status: ShopStatus) => {
-    const supabase = createClient();
-    await supabase.from('shops').update({ shop_status: status }).eq('id', shopId);
+    await shopsApi.updateShopStatus(shopId, status.toUpperCase());
     refetch();
   };
 

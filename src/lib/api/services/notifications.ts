@@ -8,3 +8,11 @@ export function listNotifications(page = 1, limit = 50) {
 export function markRead(id: string) {
   return apiFetch<ApiNotification>(`/notifications/${id}/read`, { method: 'PATCH' });
 }
+
+export function markAllRead() {
+  return apiFetch<void>('/notifications/read-all', { method: 'PATCH' });
+}
+
+export function deleteNotification(id: string) {
+  return apiFetch<void>(`/notifications/${id}`, { method: 'DELETE' });
+}

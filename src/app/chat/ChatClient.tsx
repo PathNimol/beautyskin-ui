@@ -5,7 +5,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useMockAuth } from '@/contexts/MockAuthContext';
-import { createClient } from '@/lib/supabase/client';
+import { chatApi } from '@/lib/api';
 
 interface ChatMessage {
   id: string;
@@ -53,9 +53,8 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function ChatClient() {
   const { user, role } = useMockAuth();
-  const supabase = createClient();
-
   const [activeRoom, setActiveRoom] = useState<ChatRoom>(CHAT_ROOMS[0]);
+  const [apiRooms, setApiRooms] = useState<ChatRoom[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
@@ -71,37 +70,48 @@ export default function ChatClient() {
   const fetchMessages = useCallback(async (roomId: string) => {
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('room_id', roomId)
-        .order('created_at', { ascending: true })
-        .limit(100);
-      if (data) setMessages(data as ChatMessage[]);
+      const page = await chatApi.listMessages(roomId);
+      setMessages(
+        (page.content || []).map((m) => ({
+          id: m.id,
+          room_id: roomId,
+          sender_id: m.senderId || '',
+          sender_name: m.senderName || 'User',
+          sender_role: 'buyer',
+          sender_avatar: '',
+          message: m.content,
+          message_type: 'text',
+          shop_id: null,
+          is_read: true,
+          created_at: m.createdAt || new Date().toISOString(),
+        }))
+      );
     } catch { /* ignore */ }
     setLoading(false);
-  }, [supabase]);
+  }, []);
+
+  useEffect(() => {
+    chatApi.listRooms().then((rooms) => {
+      if (rooms?.length) {
+        setApiRooms(
+          rooms.map((r) => ({
+            id: r.id,
+            name: r.name || 'Room',
+            description: r.lastMessage || '',
+            icon: 'ChatBubbleLeftRightIcon',
+            color: 'bg-rose-50 text-rose-600',
+            roles: ['admin', 'owner', 'staff', 'buyer'],
+          }))
+        );
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchMessages(activeRoom.id);
-
-    const channel = supabase
-      .channel(`chat_room_${activeRoom.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `room_id=eq.${activeRoom.id}` },
-        (payload) => {
-          setMessages(prev => {
-            const exists = prev.find(m => m.id === payload.new.id);
-            if (exists) return prev;
-            return [...prev, payload.new as ChatMessage];
-          });
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [activeRoom.id, fetchMessages, supabase]);
+    const interval = setInterval(() => fetchMessages(activeRoom.id), 5000);
+    return () => clearInterval(interval);
+  }, [activeRoom.id, fetchMessages]);
 
   useEffect(() => {
     scrollToBottom();
@@ -115,23 +125,15 @@ export default function ChatClient() {
     setInput('');
 
     try {
-      await supabase.from('chat_messages').insert({
-        room_id: activeRoom.id,
-        sender_id: user.id,
-        sender_name: user.name,
-        sender_role: role || 'buyer',
-        sender_avatar: user.avatar || '',
-        message: text,
-        message_type: 'text',
-        shop_id: user.shopId || null,
-        is_read: false,
-      });
+      await chatApi.sendMessage(activeRoom.id, text);
+      await fetchMessages(activeRoom.id);
     } catch { /* ignore */ }
     setSending(false);
     inputRef.current?.focus();
   };
 
-  const visibleRooms = CHAT_ROOMS.filter(r => role && r.roles.includes(role));
+  const roomList = apiRooms.length ? apiRooms : CHAT_ROOMS;
+  const visibleRooms = roomList.filter(r => role && r.roles.includes(role));
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);

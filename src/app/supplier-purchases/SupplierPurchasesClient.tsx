@@ -4,8 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
-import { createClient } from '@/lib/supabase/client';
-import { MOCK_PRODUCTS, MOCK_SUPPLIERS } from '@/lib/mock/data';
+import { supplierPurchasesApi, suppliersApi, productsApi } from '@/lib/api';
+import type { ApiProduct, ApiSupplier } from '@/lib/api/types';
 
 interface PurchaseItem {
   product: string;
@@ -37,10 +37,11 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function SupplierPurchasesClient() {
-  const { user } = useMockAuth();
-  const supabase = createClient();
+  const { user, shopId } = useMockAuth();
 
   const [purchases, setPurchases] = useState<SupplierPurchase[]>([]);
+  const [suppliers, setSuppliers] = useState<ApiSupplier[]>([]);
+  const [merchantProducts, setMerchantProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -59,18 +60,39 @@ export default function SupplierPurchasesClient() {
   const fetchPurchases = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('supplier_purchases')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (data) setPurchases(data as SupplierPurchase[]);
+      const page = await supplierPurchasesApi.list(shopId);
+      setPurchases(
+        (page.content || []).map((p) => ({
+          id: p.id,
+          purchase_ref: p.id.slice(0, 8),
+          supplier_name: p.supplierName || '',
+          ordered_by_name: user?.name || '',
+          items: (p.items || []).map((i) => ({
+            product: i.productName,
+            sku: '',
+            qty: i.quantity,
+            unit_cost: i.unitCost,
+            total: i.quantity * i.unitCost,
+          })),
+          total_amount: Number(p.total) || 0,
+          status: (p.status?.toLowerCase() || 'pending') as SupplierPurchase['status'],
+          expected_date: p.expectedDate || null,
+          received_date: null,
+          notes: null,
+          created_at: p.createdAt || '',
+        }))
+      );
     } catch { /* ignore */ }
     setLoading(false);
-  }, [supabase]);
+  }, [shopId, user?.name]);
 
   useEffect(() => {
     fetchPurchases();
-  }, [fetchPurchases]);
+    suppliersApi.listSuppliers({ limit: 100 }).then((p) => setSuppliers(p.content || [])).catch(() => {});
+    if (shopId) {
+      productsApi.listMerchant(shopId, { limit: 200 }).then((p) => setMerchantProducts(p.content || [])).catch(() => {});
+    }
+  }, [fetchPurchases, shopId]);
 
   const updateItem = (idx: number, field: keyof PurchaseItem, value: string | number) => {
     setForm(prev => {
@@ -102,23 +124,21 @@ export default function SupplierPurchasesClient() {
     setSaving(true);
     setErrorMsg('');
     try {
-      const ref = `PO-${Date.now()}`;
-      const { error } = await supabase.from('supplier_purchases').insert({
-        purchase_ref: ref,
-        shop_id: null,
-        shop_name: 'GlowSkin Store',
-        supplier_id: form.supplier_id || 'manual',
-        supplier_name: form.supplier_name,
-        ordered_by: user?.id || '',
-        ordered_by_name: user?.name || '',
-        items: form.items,
-        total_amount: totalAmount,
-        status: 'pending',
-        expected_date: form.expected_date || null,
-        notes: form.notes || null,
+      if (!shopId) throw new Error('Shop required');
+      const created = await supplierPurchasesApi.create(shopId, {
+        supplierId: form.supplier_id,
+        expectedDate: form.expected_date || undefined,
+        notes: form.notes || undefined,
+        lines: form.items.map((i) => {
+          const prod = merchantProducts.find((p) => p.name === i.product);
+          return {
+            productId: prod?.id,
+            quantity: i.qty,
+            unitCost: i.unit_cost,
+          };
+        }),
       });
-      if (error) throw error;
-      setSuccessMsg(`Purchase Order ${ref} created!`);
+      setSuccessMsg(`Purchase Order ${created.id.slice(0, 8)} created!`);
       setShowForm(false);
       setForm({ supplier_id: '', supplier_name: '', expected_date: '', notes: '', items: [{ product: '', sku: '', qty: 1, unit_cost: 0, total: 0 }] });
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -131,7 +151,7 @@ export default function SupplierPurchasesClient() {
 
   const updateStatus = async (id: string, status: SupplierPurchase['status']) => {
     try {
-      await supabase.from('supplier_purchases').update({ status, ...(status === 'received' ? { received_date: new Date().toISOString().split('T')[0] } : {}) }).eq('id', id);
+      await supplierPurchasesApi.updateStatus(id, status.toUpperCase());
       fetchPurchases();
     } catch { /* ignore */ }
   };
@@ -196,13 +216,13 @@ export default function SupplierPurchasesClient() {
                 <select
                   value={form.supplier_id}
                   onChange={e => {
-                    const sup = MOCK_SUPPLIERS.find(s => s.id === e.target.value);
+                    const sup = suppliers.find(s => s.id === e.target.value);
                     setForm(prev => ({ ...prev, supplier_id: e.target.value, supplier_name: sup?.name || '' }));
                   }}
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary"
                 >
                   <option value="">Select supplier...</option>
-                  {MOCK_SUPPLIERS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
               <div>
@@ -228,14 +248,14 @@ export default function SupplierPurchasesClient() {
                     <select
                       value={item.product}
                       onChange={e => {
-                        const prod = MOCK_PRODUCTS.find(p => p.name === e.target.value);
+                        const prod = merchantProducts.find(p => p.name === e.target.value);
                         updateItem(idx, 'product', e.target.value);
                         if (prod) updateItem(idx, 'sku', prod.sku);
                       }}
                       className="col-span-2 px-3 py-2 bg-background border border-border rounded-xl text-xs focus:outline-none focus:border-primary"
                     >
                       <option value="">Select product...</option>
-                      {MOCK_PRODUCTS.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                      {merchantProducts.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                     </select>
                     <input
                       type="number" min="1" value={item.qty}

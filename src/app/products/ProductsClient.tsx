@@ -5,7 +5,8 @@ import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
-import { MOCK_PRODUCTS } from '@/lib/mock/data';
+import { useMockAuth } from '@/contexts/MockAuthContext';
+import { useShopProductManagement } from '@/hooks/useShopProductManagement';
 
 const STATUS_STYLES: Record<string, string> = {
   active: 'bg-green-50 text-green-700 border-green-200',
@@ -26,6 +27,20 @@ const STATUS_LABELS: Record<string, string> = {
 const CATEGORIES = ['All', 'Serums', 'Moisturizers', 'Toners', 'Sunscreen', 'Masks', 'Eye Care'];
 
 export default function ProductsClient() {
+  const { user } = useMockAuth();
+  const { products: dbProducts, loading } = useShopProductManagement(user?.shopId);
+  const apiProducts = dbProducts.map((p) => ({
+    id: p.id,
+    name: p.name,
+    brand: p.brand,
+    category: p.category,
+    price: p.price,
+    stock: p.stock,
+    sold: p.sold,
+    sku: p.sku,
+    image: p.image,
+    status: p.product_status,
+  }));
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -35,7 +50,7 @@ export default function ProductsClient() {
   const [page, setPage] = useState(1);
   const perPage = 8;
 
-  const filtered = MOCK_PRODUCTS.filter(p => {
+  const filtered = apiProducts.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.brand.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
     const matchCat = category === 'All' || p.category === category;
     const matchStatus = statusFilter === 'All' || p.status === statusFilter;
@@ -59,7 +74,7 @@ export default function ProductsClient() {
   };
 
   return (
-    <DashboardLayout title="Products" subtitle={`${MOCK_PRODUCTS.length} total products`}>
+    <DashboardLayout title="Products" subtitle={loading ? 'Loading…' : `${apiProducts.length} total products`}>
       {/* Toolbar */}
       <div className="flex flex-col md:flex-row gap-3 mb-6">
         <div className="relative flex-1">

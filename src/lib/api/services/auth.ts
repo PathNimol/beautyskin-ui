@@ -75,11 +75,29 @@ export function verifyOtp(email: string, purpose: string, code: string) {
   }, false);
 }
 
+export function forgotPassword(email: string) {
+  return apiFetch<void>('/auth/password/forgot', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }, false);
+}
+
 export function resetPassword(email: string, code: string, newPassword: string) {
   return apiFetch<void>('/auth/password/reset', {
     method: 'POST',
     body: JSON.stringify({ email, code, newPassword }),
   }, false);
+}
+
+export function getShipping() {
+  return apiFetch<ApiUser['shipping']>('/users/me/shipping');
+}
+
+export function updateShipping(shipping: NonNullable<ApiUser['shipping']>) {
+  return apiFetch<ApiUser['shipping']>('/users/me/shipping', {
+    method: 'PATCH',
+    body: JSON.stringify(shipping),
+  });
 }
 
 export function getMe() {

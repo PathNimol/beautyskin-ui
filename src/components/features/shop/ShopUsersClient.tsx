@@ -1,12 +1,12 @@
 'use client';
 // src/components/features/shop/ShopUsersClient.tsx — per-shop user management (admin).
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { shopStaffApi, shopsApi } from '@/lib/api';
+import { useRealtimeStaff } from '@/hooks/useRealtimeData';
 import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import {
-  MOCK_SHOP_USERS,
-  MOCK_SHOPS,
   STATUS_STYLES,
   ROLE_STYLES,
   type ManagedUser,
@@ -160,10 +160,31 @@ interface Props {
 }
 
 export default function ShopUsersClient({ shopId }: Props) {
-  const shop = MOCK_SHOPS.find(
-    (s: { id: string; name: string; status: string }) => s.id === shopId
-  );
-  const [allUsers, setAllUsers] = useState<ManagedUser[]>(MOCK_SHOP_USERS);
+  const [shop, setShop] = useState<{ id: string; name: string; status: string } | null>(null);
+  const { staff, refetch } = useRealtimeStaff(shopId);
+  const [allUsers, setAllUsers] = useState<ManagedUser[]>([]);
+
+  useEffect(() => {
+    shopsApi.getShop(shopId).then((s) => setShop({ id: s.id, name: s.name, status: s.status })).catch(() => {});
+  }, [shopId]);
+
+  useEffect(() => {
+    setAllUsers(
+      staff.map((s) => ({
+        id: s.id,
+        firstName: s.name.split(' ')[0] || s.name,
+        lastName: s.name.split(' ').slice(1).join(' '),
+        email: s.email,
+        phone: s.phone || '',
+        role: (s.role === 'Owner' ? 'Owner' : 'Staff') as UserRole,
+        status: (s.status === 'Active' ? 'active' : 'inactive') as UserStatus,
+        joinDate: s.created_at,
+        lastActive: s.updated_at,
+        orders: 0,
+        totalSpent: 0,
+      }))
+    );
+  }, [staff]);
 
   const [search, setSearch] = useState('');
   const [roleTab, setRoleTab] = useState<UserRole | 'all'>('all');
@@ -535,7 +556,7 @@ export default function ShopUsersClient({ shopId }: Props) {
         <UserFormModal
           mode={formMode}
           user={editTarget}
-          shops={MOCK_SHOPS}
+          shops={shop ? [shop] : []}
           onSave={handleSave}
           onClose={() => {
             setFormMode(null);

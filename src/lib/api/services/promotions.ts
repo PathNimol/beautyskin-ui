@@ -10,3 +10,28 @@ export function listPromotions(shopId?: string, params?: { status?: string; sear
   q.set('limit', String(params?.limit ?? 50));
   return apiFetch<PageData<ApiPromotion>>(`/promotions?${q}`);
 }
+
+export function createPromotion(shopId: string, body: Record<string, unknown>) {
+  return apiFetch<ApiPromotion>(`/promotions?shopId=${shopId}`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updatePromotion(id: string, body: Record<string, unknown>) {
+  return apiFetch<ApiPromotion>(`/promotions/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updatePromotionStatus(id: string, status: string) {
+  return apiFetch<ApiPromotion>(`/promotions/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function deletePromotion(id: string) {
+  return apiFetch<void>(`/promotions/${id}`, { method: 'DELETE' });
+}
