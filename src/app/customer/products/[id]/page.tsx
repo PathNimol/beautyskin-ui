@@ -1,5 +1,5 @@
 import React from "react";
-import ProductDetailClient from "./ProductDetailClient";
+import ProductDetailClient from "@/app/product-detail/[id]/ProductDetailClient";
 import DashboardLayout from "@/components/DashboardLayout";
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {

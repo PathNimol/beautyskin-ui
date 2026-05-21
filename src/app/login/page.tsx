@@ -62,14 +62,11 @@ function LoginForm() {
     }
   };
 
-  const handleOAuth = async (provider: OAuthProvider) => {
+  // OAuth is now a plain redirect — no async, no try/catch needed
+  const handleOAuth = (provider: OAuthProvider) => {
     setError('');
-    try {
-      const user = await signInWithOAuth(provider);
-      router.push(sanitizeRedirect(redirectParam, user.role));
-    } catch {
-      setError(`Could not sign in with ${provider}.`);
-    }
+    signInWithOAuth(provider);
+    // Browser will redirect to Google/Facebook — no further action here
   };
 
   return (
@@ -103,7 +100,7 @@ function MotionLoginForm(props: {
   error: string;
   loading: boolean;
   handleLogin: (e: React.FormEvent) => void;
-  handleOAuth: (p: OAuthProvider) => Promise<void>;
+  handleOAuth: (p: OAuthProvider) => void;
   fillCredentials: (e: string, p: string) => void;
 }) {
   const {
@@ -141,13 +138,45 @@ function MotionLoginForm(props: {
         )}
 
         <form onSubmit={handleLogin} className="space-y-5 mt-2">
-          <MotionEmailField email={email} setEmail={setEmail} />
-          <MotionPasswordField
-            password={password}
-            setPassword={setPassword}
-            showPassword={showPassword}
-            setShowPassword={setShowPassword}
-          />
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-2">
+              Email address
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+              className="w-full px-4 py-3 bg-card border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-semibold text-foreground">Password</label>
+              <Link href="/forgot-password" className="text-xs text-accent font-medium">
+                Forgot password?
+              </Link>
+            </div>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                className="w-full px-4 py-3 pr-12 bg-card border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={18} />
+              </button>
+            </div>
+          </div>
           <button
             type="submit"
             disabled={loading}
@@ -200,86 +229,9 @@ function MotionLoginForm(props: {
             </span>
           </div>
         </div>
+
         <SocialAuthButtons onProvider={handleOAuth} disabled={loading} />
       </div>
-    </div>
-  );
-}
-
-function MotionEmailField({ email, setEmail }: { email: string; setEmail: (v: string) => void }) {
-  return (
-    <div>
-      <label className="block text-sm font-semibold text-foreground mb-2">Email address</label>
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@example.com"
-        required
-        className="w-full px-4 py-3 bg-card border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-      />
-    </div>
-  );
-}
-
-function MotionPasswordField({
-  password,
-  setPassword,
-  showPassword,
-  setShowPassword,
-}: {
-  password: string;
-  setPassword: (v: string) => void;
-  showPassword: boolean;
-  setShowPassword: (v: boolean) => void;
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="block text-sm font-semibold text-foreground">Password</label>
-        <Link href="/forgot-password" className="text-xs text-accent font-medium">
-          Forgot password?
-        </Link>
-      </div>
-      <MotionPasswordInput
-        password={password}
-        setPassword={setPassword}
-        showPassword={showPassword}
-        setShowPassword={setShowPassword}
-      />
-    </div>
-  );
-}
-
-function MotionPasswordInput({
-  password,
-  setPassword,
-  showPassword,
-  setShowPassword,
-}: {
-  password: string;
-  setPassword: (v: string) => void;
-  showPassword: boolean;
-  setShowPassword: (v: boolean) => void;
-}) {
-  return (
-    <div className="relative">
-      <input
-        type={showPassword ? 'text' : 'password'}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Enter your password"
-        required
-        className="w-full px-4 py-3 pr-12 bg-card border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-      />
-      <button
-        type="button"
-        onClick={() => setShowPassword(!showPassword)}
-        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-        aria-label={showPassword ? 'Hide password' : 'Show password'}
-      >
-        <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={18} />
-      </button>
     </div>
   );
 }
@@ -289,29 +241,21 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex">
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden rose-gradient-bg items-center justify-center p-12">
         <div className="absolute inset-0 dot-pattern opacity-40" />
-        <MotionLoginPanel />
+        <div className="relative z-10 text-center max-w-md">
+          <Link href="/" className="flex justify-center mb-8">
+            <AppLogo size={500} />
+          </Link>
+        </div>
       </div>
-      <Suspense fallback={<LoginFallback />}>
+      <Suspense
+        fallback={
+          <div className="flex-1 flex items-center justify-center p-12 text-muted-foreground">
+            Loading…
+          </div>
+        }
+      >
         <LoginForm />
       </Suspense>
-    </div>
-  );
-}
-
-function MotionLoginPanel() {
-  return (
-    <div className="relative z-10 text-center max-w-md">
-      <Link href="/" className="flex justify-center mb-8">
-        <AppLogo size={500} />
-      </Link>
-    </div>
-  );
-}
-
-function LoginFallback() {
-  return (
-    <div className="flex-1 flex items-center justify-center p-12 text-muted-foreground">
-      Loading…
     </div>
   );
 }

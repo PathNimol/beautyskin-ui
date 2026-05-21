@@ -197,7 +197,7 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['staff'],
     section: 'staff',
   },
-  // Shared chat/DM for admin, owner, staff
+  // Shared
   {
     label: 'Chat',
     icon: 'ChatBubbleLeftRightIcon',
@@ -219,7 +219,7 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['admin', 'owner', 'staff'],
     section: 'shared',
   },
-  // Customer
+  // Customer — "Shop" tab removed
   {
     label: 'My Account',
     icon: 'UserCircleIcon',
@@ -231,13 +231,6 @@ const NAV_ITEMS: NavItem[] = [
     label: 'All Products',
     icon: 'ArchiveBoxIcon',
     href: '/customer/products',
-    roles: ['customer', 'buyer'],
-    section: 'customer',
-  },
-  {
-    label: 'Shop',
-    icon: 'ShoppingBagIcon',
-    href: '/customer/shop',
     roles: ['customer', 'buyer'],
     section: 'customer',
   },
@@ -310,35 +303,51 @@ export default function DashboardSidebar() {
         <AppLogo size={collapsed ? 40 : 200} />
       </Link>
 
-      {/* Role badge */}
+      {/* User badge — click to go to profile */}
       {!collapsed && role && (
-        <div className="px-4 py-3 border-b border-border">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-primary/30 shrink-0">
-              {user?.avatar ? (
-                <AppImage
-                  src={user.avatar}
-                  alt={user.avatarAlt || 'User avatar'}
-                  width={32}
-                  height={32}
-                  className="object-cover w-full h-full"
-                />
-              ) : (
-                <div className="w-full h-full bg-primary/20 flex items-center justify-center">
-                  <Icon name="UserIcon" size={14} className="text-rose-deep" />
-                </div>
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-foreground truncate">{user?.name}</p>
-              <span
-                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${ROLE_COLORS[role]}`}
-              >
-                {ROLE_LABELS[role]}
-              </span>
-            </div>
+        <Link
+          href={
+            role === 'customer' || role === 'buyer'
+              ? '/customer/account'
+              : role === 'owner'
+                ? '/owner/dashboard'
+                : role === 'staff'
+                  ? '/staff/dashboard'
+                  : '/admin/dashboard'
+          }
+          className="px-4 py-3 border-b border-border flex items-center gap-2.5 hover:bg-secondary transition-colors group"
+        >
+          <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-primary/30 shrink-0">
+            {user?.avatar ? (
+              <AppImage
+                src={user.avatar}
+                alt={user.avatarAlt || 'User avatar'}
+                width={32}
+                height={32}
+                className="object-cover w-full h-full"
+              />
+            ) : (
+              <div className="w-full h-full bg-primary/20 flex items-center justify-center">
+                <Icon name="UserIcon" size={14} className="text-rose-deep" />
+              </div>
+            )}
           </div>
-        </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-foreground truncate group-hover:text-rose-deep transition-colors">
+              {user?.name}
+            </p>
+            <span
+              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${ROLE_COLORS[role]}`}
+            >
+              {ROLE_LABELS[role]}
+            </span>
+          </div>
+          <Icon
+            name="ChevronRightIcon"
+            size={12}
+            className="text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          />
+        </Link>
       )}
 
       {/* Nav */}

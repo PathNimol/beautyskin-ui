@@ -11,6 +11,8 @@ import type { MockUser, UserRole, CustomerShipping } from '@/lib/mock/data';
 
 type OAuthProvider = 'google' | 'facebook' | 'tiktok';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api';
+
 /** Spring API only registers CUSTOMER accounts — UI restricts self-signup accordingly. */
 interface RegisterPendingInput {
   firstName: string;
@@ -27,12 +29,19 @@ interface MockAuthContextType {
   role: UserRole | null;
   shopId: string | null;
   signIn: (email: string, password: string) => Promise<MockUser>;
-  signInWithOAuth: (provider: OAuthProvider) => Promise<MockUser>;
+  signInWithOAuth: (provider: OAuthProvider) => void;
   registerPending: (input: RegisterPendingInput) => Promise<RegisterPendingResponse>;
   confirmRegistration: (email: string, code: string) => Promise<MockUser>;
   signOut: () => Promise<void>;
   refreshSession: () => boolean;
-  updateProfile: (patch: Partial<MockUser> & { shipping?: Partial<CustomerShipping> }) => void;
+  updateProfile: (patch: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    avatar?: string;
+    avatarAlt?: string;
+    shipping?: Partial<CustomerShipping>;
+  }) => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -64,7 +73,10 @@ function deleteCookie(name: string) {
   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
 }
 
-function persistSession(user: MockUser, tokens: { accessToken: string; refreshToken: string; expiresIn: number }) {
+function persistSession(
+  user: MockUser,
+  tokens: { accessToken: string; refreshToken: string; expiresIn: number }
+) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   saveAuthTokens(tokens);
   setCookie('bs_session', user.id);
@@ -101,10 +113,8 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
 
   useEffect(() => {
     const isPublic = isPublicRoute(pathname);
-    const hasTokens =
-      typeof window !== 'undefined' && !!localStorage.getItem(TOKEN_KEY);
+    const hasTokens = typeof window !== 'undefined' && !!localStorage.getItem(TOKEN_KEY);
 
-    // Guests on home/storefront: render immediately without waiting on auth API
     if (isPublic && !hasTokens) {
       setUser(null);
       setLoading(false);
@@ -139,13 +149,12 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
     [establishFromTokenPayload]
   );
 
-  const signInWithOAuth = useCallback(
-    async (provider: OAuthProvider) => {
-      const res = await authApi.oauth(provider);
-      return establishFromTokenPayload(res);
-    },
-    [establishFromTokenPayload]
-  );
+  const signInWithOAuth = useCallback((provider: OAuthProvider) => {
+    // OAuth2 requires a full browser redirect — cannot use fetch (CORS blocks the redirect)
+    // Spring Security handles the flow: /oauth2/authorize → Google → /oauth2/callback → frontend
+    const redirectAfter = encodeURIComponent(window.location.pathname);
+    window.location.href = `${API_BASE.replace('/api', '')}/oauth2/authorization/${provider}?redirect=${redirectAfter}`;
+  }, []);
 
   const registerPending = useCallback(async (input: RegisterPendingInput) => {
     return authApi.register({
@@ -190,23 +199,36 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
   };
 
   const updateProfile = useCallback(
-    async (patch: Partial<MockUser> & { shipping?: Partial<CustomerShipping> }) => {
+    async (patch: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      avatar?: string;
+      avatarAlt?: string;
+      shipping?: Partial<CustomerShipping>;
+    }) => {
       if (!user) return;
-      try {
-        const body: Record<string, unknown> = {};
-        if (patch.name) body.name = patch.name;
-        if (patch.phone) body.phone = patch.phone;
-        if (patch.avatar) body.avatar = patch.avatar;
-        if (patch.shipping) body.shipping = { ...(user.shipping ?? emptyShipping(user)), ...patch.shipping };
-        const updated = await authApi.updateProfile(body);
-        const normalized = normalizeUser(mapApiUserToMock(updated));
-        setUser(normalized);
-        const tokensRaw = localStorage.getItem(TOKEN_KEY);
-        const tokens = tokensRaw ? (JSON.parse(tokensRaw) as { accessToken: string; refreshToken: string; expiresIn: number }) : null;
-        if (tokens?.accessToken) persistSession(normalized, tokens);
-      } catch (e) {
-        if (e instanceof ApiError) throw e;
-      }
+      // Build body matching the API payload exactly
+      const body: Record<string, unknown> = {};
+      if (patch.firstName) body.firstName = patch.firstName;
+      if (patch.lastName) body.lastName = patch.lastName;
+      if (patch.phone) body.phone = patch.phone;
+      if (patch.avatar) body.avatar = patch.avatar;
+      if (patch.avatarAlt) body.avatarAlt = patch.avatarAlt;
+      if (patch.shipping)
+        body.shipping = { ...(user.shipping ?? emptyShipping(user)), ...patch.shipping };
+      const updated = await authApi.updateProfile(body);
+      const normalized = normalizeUser(mapApiUserToMock(updated));
+      setUser(normalized);
+      const tokensRaw = localStorage.getItem(TOKEN_KEY);
+      const tokens = tokensRaw
+        ? (JSON.parse(tokensRaw) as {
+            accessToken: string;
+            refreshToken: string;
+            expiresIn: number;
+          })
+        : null;
+      if (tokens?.accessToken) persistSession(normalized, tokens);
     },
     [user]
   );
@@ -224,9 +246,8 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
         confirmRegistration,
         signOut,
         refreshSession,
-        updateProfile: (patch) => {
-          void updateProfile(patch);
-        },
+        // Expose as async so callers can await and catch errors
+        updateProfile,
         isAuthenticated: !!user,
       }}
     >

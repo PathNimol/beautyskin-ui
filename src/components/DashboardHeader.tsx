@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useMockAuth } from '@/contexts/MockAuthContext';
@@ -34,18 +35,33 @@ const NOTIF_COLOR: Record<DbNotification['type'], string> = {
   system: 'bg-secondary text-muted-foreground',
 };
 
+function profileHref(role: UserRole | null): string {
+  if (!role) return '/';
+  if (role === 'customer' || role === 'buyer') return '/customer/account';
+  if (role === 'owner') return '/owner/dashboard';
+  if (role === 'staff') return '/staff/dashboard';
+  return '/admin/dashboard';
+}
+
 // ─── Toast Notification ───────────────────────────────────────────────────────
 function NotifToast({ notif, onDismiss }: { notif: DbNotification; onDismiss: () => void }) {
   return (
     <div className="flex items-start gap-3 bg-card border border-border rounded-2xl shadow-xl px-4 py-3.5 w-80 animate-slide-in">
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${NOTIF_COLOR[notif.type]}`}>
+      <div
+        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${NOTIF_COLOR[notif.type]}`}
+      >
         <Icon name={NOTIF_ICON[notif.type] as Parameters<typeof Icon>[0]['name']} size={15} />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-bold text-foreground">{notif.title}</p>
-        <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{notif.message}</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">
+          {notif.message}
+        </p>
       </div>
-      <button onClick={onDismiss} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
+      <button
+        onClick={onDismiss}
+        className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+      >
         <Icon name="XMarkIcon" size={14} />
       </button>
     </div>
@@ -58,15 +74,14 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // Real-time notifications (no shop filter for admin/owner — all shops)
-  const { notifications, unreadCount, toastQueue, markAsRead, markAllAsRead, dismissToast } = useRealtimeNotifications();
+  const { notifications, unreadCount, toastQueue, markAsRead, markAllAsRead, dismissToast } =
+    useRealtimeNotifications();
 
   const handleSignOut = () => {
     signOut();
     router.push('/login');
   };
 
-  // Format relative time
   const relativeTime = (iso: string) => {
     const diff = Date.now() - new Date(iso).getTime();
     const mins = Math.floor(diff / 60000);
@@ -81,7 +96,9 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
     <>
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border px-6 py-4 flex items-center justify-between gap-4">
         <div className="pl-10 md:pl-0">
-          <h1 className="text-xl md:text-2xl font-extrabold text-foreground tracking-tight">{title}</h1>
+          <h1 className="text-xl md:text-2xl font-extrabold text-foreground tracking-tight">
+            {title}
+          </h1>
           {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
 
@@ -89,7 +106,10 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
           {/* Notifications */}
           <div className="relative">
             <button
-              onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }}
+              onClick={() => {
+                setNotifOpen(!notifOpen);
+                setProfileOpen(false);
+              }}
               className="relative w-9 h-9 bg-secondary border border-border rounded-xl flex items-center justify-center hover:bg-primary/10 transition-all"
               aria-label="Notifications"
             >
@@ -124,14 +144,16 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
                       <p className="text-xs text-muted-foreground">No notifications yet</p>
                     </div>
                   ) : (
-                    notifications.slice(0, 8).map(n => (
+                    notifications.slice(0, 8).map((n) => (
                       <div
                         key={n.id}
                         onClick={() => markAsRead(n.id)}
                         className={`px-5 py-3.5 hover:bg-secondary transition-all cursor-pointer ${!n.is_read ? 'bg-primary/5' : ''}`}
                       >
                         <div className="flex items-start gap-3">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${NOTIF_COLOR[n.type]}`}>
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${NOTIF_COLOR[n.type]}`}
+                          >
                             <Icon
                               name={NOTIF_ICON[n.type] as Parameters<typeof Icon>[0]['name']}
                               size={14}
@@ -139,10 +161,16 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-semibold text-foreground">{n.title}</p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">{n.message}</p>
-                            <p className="text-[10px] text-muted-foreground/60 mt-1">{relativeTime(n.created_at)}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">
+                              {n.message}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground/60 mt-1">
+                              {relativeTime(n.created_at)}
+                            </p>
                           </div>
-                          {!n.is_read && <div className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1" />}
+                          {!n.is_read && (
+                            <div className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1" />
+                          )}
                         </div>
                       </div>
                     ))
@@ -163,12 +191,21 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
           {/* Profile */}
           <div className="relative">
             <button
-              onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }}
+              onClick={() => {
+                setProfileOpen(!profileOpen);
+                setNotifOpen(false);
+              }}
               className="flex items-center gap-2 px-3 py-2 bg-secondary border border-border rounded-xl hover:bg-primary/10 transition-all"
             >
               <div className="w-7 h-7 rounded-full overflow-hidden border border-border shrink-0">
                 {user?.avatar ? (
-                  <AppImage src={user.avatar} alt={user?.avatarAlt || 'User'} width={28} height={28} className="object-cover w-full h-full" />
+                  <AppImage
+                    src={user.avatar}
+                    alt={user?.avatarAlt || 'User'}
+                    width={28}
+                    height={28}
+                    className="object-cover w-full h-full"
+                  />
                 ) : (
                   <div className="w-full h-full bg-primary/20 flex items-center justify-center">
                     <Icon name="UserIcon" size={13} className="text-rose-deep" />
@@ -177,18 +214,48 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
               </div>
               <div className="hidden sm:block text-left">
                 <p className="text-xs font-bold text-foreground leading-none">{user?.name}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{role ? ROLE_LABELS[role] : ''}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {role ? ROLE_LABELS[role] : ''}
+                </p>
               </div>
-              <Icon name="ChevronDownIcon" size={13} className="text-muted-foreground hidden sm:block" />
+              <Icon
+                name="ChevronDownIcon"
+                size={13}
+                className="text-muted-foreground hidden sm:block"
+              />
             </button>
 
             {profileOpen && (
               <div className="absolute right-0 top-11 w-52 bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden">
-                <div className="px-4 py-3 border-b border-border">
-                  <p className="text-xs font-bold text-foreground">{user?.name}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{user?.email}</p>
-                </div>
+                {/* Click name/email → go to profile */}
+                <Link
+                  href={profileHref(role)}
+                  onClick={() => setProfileOpen(false)}
+                  className="px-4 py-3 border-b border-border flex items-center gap-2 hover:bg-secondary transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-foreground group-hover:text-rose-deep transition-colors">
+                      {user?.name}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                      {user?.email}
+                    </p>
+                  </div>
+                  <Icon
+                    name="ChevronRightIcon"
+                    size={12}
+                    className="text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  />
+                </Link>
                 <div className="p-2">
+                  <Link
+                    href={profileHref(role)}
+                    onClick={() => setProfileOpen(false)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary transition-all"
+                  >
+                    <Icon name="UserCircleIcon" size={15} />
+                    My Profile
+                  </Link>
                   <button
                     onClick={handleSignOut}
                     className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-red-600 hover:bg-red-50 transition-all"
@@ -203,10 +270,10 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
         </div>
       </header>
 
-      {/* Toast Stack — fixed bottom-right */}
+      {/* Toast Stack */}
       {toastQueue.length > 0 && (
         <div className="fixed bottom-6 right-6 z-[500] flex flex-col gap-3 pointer-events-none">
-          {toastQueue.slice(0, 4).map(n => (
+          {toastQueue.slice(0, 4).map((n) => (
             <div key={n.id} className="pointer-events-auto">
               <NotifToast notif={n} onDismiss={() => dismissToast(n.id)} />
             </div>
