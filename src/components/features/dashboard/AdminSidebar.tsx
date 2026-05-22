@@ -8,13 +8,13 @@ import { useMockAuth } from '@/contexts/MockAuthContext';
 
 const navItems = [
   { label: 'Dashboard', icon: 'Squares2X2Icon', href: '/admin/dashboard' },
-  { label: 'Products', icon: 'ArchiveBoxIcon', href: '/admin/products' },
-  { label: 'Orders', icon: 'ClipboardDocumentListIcon', href: '/admin/orders' },
   { label: 'Shops', icon: 'BuildingStorefrontIcon', href: '/admin/shops' },
   { label: 'Customers', icon: 'UsersIcon', href: '/admin/customers' },
+  { label: 'Orders', icon: 'ClipboardDocumentListIcon', href: '/admin/orders' },
+  { label: 'Products', icon: 'ArchiveBoxIcon', href: '/admin/products' },
+  { label: 'Inventory', icon: 'CubeIcon', href: '/admin/inventory' },
   { label: 'Analytics', icon: 'ChartBarIcon', href: '/admin/analytics' },
-  { label: 'Promotions', icon: 'TagIcon', href: '/admin/promotions' },
-  { label: 'Suppliers', icon: 'TruckIcon', href: '/admin/suppliers' },
+  { label: 'Reports', icon: 'DocumentChartBarIcon', href: '/admin/reports' },
   { label: 'Settings', icon: 'Cog6ToothIcon', href: '/settings' },
 ];
 
@@ -54,6 +54,8 @@ export default function AdminSidebar() {
             <Link
               key={item.label}
               href={item.href}
+              prefetch
+              scroll={false}
               onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all min-h-[44px] group ${
                 isActive

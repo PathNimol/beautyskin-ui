@@ -20,7 +20,7 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, 'quantity'>, qty?: number) => void;
+  addItem: (item: Omit<CartItem, 'quantity'>, qty?: number) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
   updateQuantity: (id: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -82,6 +82,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const refreshCart = useCallback(async () => {
     if (!isAuthenticated) {
       loadLocal();
+      setLoading(false);
       return;
     }
     setLoading(true);

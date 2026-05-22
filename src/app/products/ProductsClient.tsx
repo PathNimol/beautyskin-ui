@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useMockAuth } from '@/contexts/MockAuthContext';
@@ -74,8 +73,7 @@ export default function ProductsClient() {
   };
 
   return (
-    <DashboardLayout title="Products" subtitle={loading ? 'Loading…' : `${apiProducts.length} total products`}>
-      {/* Toolbar */}
+    <>{/* Toolbar */}
       <div className="flex flex-col md:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Icon name="MagnifyingGlassIcon" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -285,6 +283,6 @@ export default function ProductsClient() {
           ))}
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

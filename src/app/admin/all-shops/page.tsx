@@ -1,16 +1,5 @@
-import React from 'react';
-import AdminSidebar from '@/components/features/dashboard/AdminSidebar';
-import ShopsClient from '@/components/features/shop/ShopsClient';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'All shops — BS Admin' };
-
-export default function AdminAllShopsPage() {
-  return (
-    <div className="flex min-h-screen bg-admin-bg">
-      <AdminSidebar />
-      <main className="flex-1 min-w-0 overflow-x-hidden">
-        <ShopsClient />
-      </main>
-    </div>
-  );
+export default function AdminAllShopsRedirect() {
+  redirect('/admin/shops');
 }

@@ -40,6 +40,8 @@ export interface ApiUser {
   firstName?: string;
   lastName?: string;
   role: string;
+  /** AccountStatus from API: ACTIVE, INACTIVE, SUSPENDED, PENDING_EMAIL_VERIFICATION */
+  status?: string;
   shopId?: string | null;
   avatar?: string;
   avatarAlt?: string;
@@ -344,7 +346,9 @@ export interface ApiRevokeRequest {
 export interface ApiChatRoom {
   id: string;
   name?: string;
+  roomType?: string;
   type?: string;
+  allowedRoles?: string;
   lastMessage?: string;
   unreadCount?: number;
 }

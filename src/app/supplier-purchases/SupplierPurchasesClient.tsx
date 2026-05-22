@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { supplierPurchasesApi, suppliersApi, productsApi } from '@/lib/api';
@@ -159,8 +158,7 @@ export default function SupplierPurchasesClient() {
   const totalSpent = purchases.filter(p => p.status === 'received').reduce((s, p) => s + Number(p.total_amount), 0);
 
   return (
-    <DashboardLayout title="Supplier Purchases" subtitle="Restock products from suppliers — all purchases recorded as reports">
-      {successMsg && (
+    <>{successMsg && (
         <div className="mb-4 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
           <Icon name="CheckCircleIcon" size={18} className="text-green-600 shrink-0" />
           <p className="text-sm text-green-700 font-medium">{successMsg}</p>
@@ -402,6 +400,6 @@ export default function SupplierPurchasesClient() {
           )}
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

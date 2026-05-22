@@ -109,15 +109,25 @@ export interface DbNotification {
   created_at: string;
 }
 
-export function useRealtimeInventory(shopIdOverride?: string) {
-  const { shopId: authShopId, isAuthenticated } = useMockAuth();
-  const shopId = shopIdOverride ?? authShopId ?? undefined;
+export function useRealtimeInventory(shopIdOverride?: string, platformWide = false) {
+  const { shopId: authShopId, role, isAuthenticated } = useMockAuth();
+  const shopId =
+    platformWide && role === 'admin'
+      ? undefined
+      : role === 'admin'
+        ? shopIdOverride
+        : shopIdOverride ?? authShopId ?? undefined;
   const [inventory, setInventory] = useState<DbInventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchInventory = useCallback(async () => {
-    if (!isAuthenticated || !shopId) {
+    if (!isAuthenticated) {
+      setInventory([]);
+      setLoading(false);
+      return;
+    }
+    if (!shopId && !(platformWide && role === 'admin')) {
       setInventory([]);
       setLoading(false);
       return;
@@ -131,7 +141,7 @@ export function useRealtimeInventory(shopIdOverride?: string) {
     } finally {
       setLoading(false);
     }
-  }, [shopId, isAuthenticated]);
+  }, [shopId, isAuthenticated, platformWide, role]);
 
   const restockItem = useCallback(
     async (itemId: string, qty: number) => {

@@ -1,4 +1,5 @@
-import React from 'react';
+'use client';
+
 import DirectMessagesClient from '@/app/direct-messages/DirectMessagesClient';
 
 export default function CustomerDirectMessagesPage() {

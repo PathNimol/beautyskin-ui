@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useDashboardNav } from '@/contexts/DashboardNavContext';
 import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import type { UserRole } from '@/lib/mock/data';
+import { startNavigation } from '@/lib/navigation';
 
 interface NavItem {
   label: string;
@@ -281,6 +283,7 @@ export default function DashboardSidebar() {
   const { user, role, signOut } = useMockAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const { pendingPath, beginNavigation } = useDashboardNav();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -289,9 +292,13 @@ export default function DashboardSidebar() {
     (item) => normalizedRole && item.roles.includes(normalizedRole as UserRole)
   );
 
+  useEffect(() => {
+    visibleItems.forEach((item) => router.prefetch(item.href));
+  }, [visibleItems, router]);
+
   const handleSignOut = () => {
-    signOut();
-    router.push('/');
+    startNavigation();
+    void signOut().then(() => router.push('/'));
   };
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
@@ -353,12 +360,21 @@ export default function DashboardSidebar() {
       {/* Nav */}
       <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto">
         {visibleItems.map((item) => {
-          const active = isActive(item.href);
+          const active =
+            pendingPath != null
+              ? pendingPath === item.href || pendingPath.startsWith(item.href + '/')
+              : isActive(item.href);
           return (
             <Link
               key={item.label + item.href}
               href={item.href}
-              onClick={() => setMobileOpen(false)}
+              prefetch
+              scroll={false}
+              data-skip-nav-progress
+              onClick={() => {
+                beginNavigation(item.href);
+                setMobileOpen(false);
+              }}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all min-h-[44px] group relative ${
                 active
                   ? 'bg-primary/15 text-foreground font-semibold'

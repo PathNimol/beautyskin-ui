@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useMockAuth } from '@/contexts/MockAuthContext';
@@ -312,22 +311,7 @@ export default function DashboardClient() {
   const kpis = role === 'admin' ? adminKPIs : role === 'owner' ? ownerKPIs : staffKPIs;
 
   return (
-    <DashboardLayout
-      title={
-        role === 'admin'
-          ? 'Platform Dashboard'
-          : role === 'owner'
-            ? 'Shop Dashboard'
-            : 'Staff Dashboard'
-      }
-      subtitle={
-        role === 'admin'
-          ? 'Full platform analytics & control'
-          : role === 'owner'
-            ? `Managing ${user?.shopId ? 'your shop' : 'shop'}`
-            : `Welcome Back, ${user?.name}`
-      }
-    >
+    <>
       {isLoading && (
         <div className="flex items-center gap-2 mb-4 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl w-fit">
           <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -830,6 +814,6 @@ export default function DashboardClient() {
           )}
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

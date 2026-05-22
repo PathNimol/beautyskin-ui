@@ -1,4 +1,5 @@
-import React from 'react';
+'use client';
+
 import ChatClient from '@/app/chat/ChatClient';
 
 export default function CustomerChatPage() {

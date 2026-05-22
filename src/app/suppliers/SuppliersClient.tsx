@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useSuppliersList } from '@/hooks/useApiLists';
@@ -23,8 +22,7 @@ export default function SuppliersClient() {
   const totalOrders = suppliers.reduce((sum, s) => sum + (s.totalOrders || 0), 0);
 
   return (
-    <DashboardLayout title="Suppliers" subtitle={loading ? 'Loading…' : `${suppliers.length} registered suppliers`}>
-      {/* Stats */}
+    <>{/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
           { label: 'Total Suppliers', value: suppliers.length, icon: 'TruckIcon', color: 'bg-blue-50 text-blue-600' },
@@ -156,6 +154,6 @@ export default function SuppliersClient() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

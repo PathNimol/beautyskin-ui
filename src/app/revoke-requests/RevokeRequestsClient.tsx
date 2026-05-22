@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { revokeRequestsApi, productsApi } from '@/lib/api';
@@ -137,8 +136,7 @@ export default function RevokeRequestsClient() {
   const pendingCount = requests.filter(r => r.status === 'pending').length;
 
   return (
-    <DashboardLayout title="Revoke Requests" subtitle="Request removal of expired, broken, or tester products">
-      {successMsg && (
+    <>{successMsg && (
         <div className="mb-4 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
           <Icon name="CheckCircleIcon" size={18} className="text-green-600 shrink-0" />
           <p className="text-sm text-green-700 font-medium">{successMsg}</p>
@@ -343,6 +341,6 @@ export default function RevokeRequestsClient() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

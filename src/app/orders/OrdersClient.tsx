@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useRealtimeOrders } from '@/hooks/useRealtimeData';
@@ -128,15 +127,13 @@ export default function OrdersClient() {
 
   if (loading && orders.length === 0) {
     return (
-      <DashboardLayout title="Orders" subtitle="Loading orders...">
-        <div className="flex items-center justify-center py-20 text-muted-foreground">Loading...</div>
-      </DashboardLayout>
+      <><div className="flex items-center justify-center py-20 text-muted-foreground">Loading...</div>
+      </>
     );
   }
 
   return (
-    <DashboardLayout title="Orders" subtitle={`${orders.length} total orders`}>
-      {error && (
+    <>{error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>
       )}
       {successMsg && (
@@ -297,7 +294,7 @@ export default function OrdersClient() {
       {selectedOrder && (
         <OrderDetailModal order={selectedOrder} timeline={ORDER_TIMELINE} onClose={() => setSelectedOrder(null)} />
       )}
-    </DashboardLayout>
+    </>
   );
 }
 

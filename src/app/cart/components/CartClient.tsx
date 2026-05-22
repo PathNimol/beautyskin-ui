@@ -7,6 +7,7 @@ import Icon from '@/components/ui/AppIcon';
 import { useCart } from '@/contexts/CartContext';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { ApiError } from '@/lib/api/client';
+import DashboardContentSkeleton from '@/components/ui/DashboardContentSkeleton';
 
 const GUEST_PROMO_CODES: Record<string, { discount: number; type: 'percent' | 'fixed'; label: string }> = {
   BEAUTY10: { discount: 10, type: 'percent', label: '10% off your order' },
@@ -122,11 +123,7 @@ export default function CartClient({ embedded = false }: { embedded?: boolean })
   };
 
   if (loading && items.length === 0) {
-    return (
-      <div className={`max-w-7xl mx-auto px-6 text-center ${embedded ? 'py-8' : 'py-20'}`}>
-        <p className="text-muted-foreground">Loading your cart…</p>
-      </div>
-    );
+    return <DashboardContentSkeleton />;
   }
 
   if (items.length === 0) {

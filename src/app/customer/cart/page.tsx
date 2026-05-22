@@ -1,15 +1,7 @@
-import React from 'react';
-import CartClient from '@/app/cart/components/CartClient';
-import DashboardLayout from '@/components/DashboardLayout';
+'use client';
 
-export const metadata = {
-  title: 'Cart — BS Online Shop',
-};
+import CartClient from '@/app/cart/components/CartClient';
 
 export default function CustomerCartPage() {
-  return (
-    <DashboardLayout title="Cart" subtitle="Review items before checkout">
-      <CartClient embedded />
-    </DashboardLayout>
-  );
+  return <CartClient embedded />;
 }

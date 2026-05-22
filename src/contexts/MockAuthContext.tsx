@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { isPublicRoute } from '@/lib/auth/publicRoutes';
 import { authApi, mapApiUserToMock, saveAuthTokens, clearAuthTokens, ApiError } from '@/lib/api';
@@ -82,10 +82,31 @@ function persistSession(
   setCookie('bs_session', user.id);
 }
 
+function readCachedUser(): MockUser | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return normalizeUser(JSON.parse(raw) as MockUser);
+  } catch {
+    return null;
+  }
+}
+
+function initialAuthLoading(pathname: string): boolean {
+  if (typeof window === 'undefined') return true;
+  const hasTokens = !!localStorage.getItem(TOKEN_KEY);
+  if (!hasTokens) return false;
+  // Keep loading true until the first session sync — avoids SSR/client role mismatch
+  if (!isPublicRoute(pathname) && hasTokens) return true;
+  return false;
+}
+
 export const MockAuthProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const [user, setUser] = useState<MockUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<MockUser | null>(() => readCachedUser());
+  const [loading, setLoading] = useState(() => initialAuthLoading(pathname));
+  const protectedSessionSynced = useRef(false);
 
   const loadSession = useCallback(async (options?: { blockUi?: boolean }) => {
     const blockUi = options?.blockUi ?? true;
@@ -118,6 +139,7 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
     if (isPublic && !hasTokens) {
       setUser(null);
       setLoading(false);
+      protectedSessionSynced.current = false;
       return;
     }
 
@@ -127,11 +149,26 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
       return;
     }
 
-    void loadSession({ blockUi: true });
+    // Protected routes: sync session once — do not refetch on every sidebar navigation
+    const cached = readCachedUser();
+    if (cached) {
+      setUser((prev) => prev ?? cached);
+      setLoading(false);
+      if (!protectedSessionSynced.current) {
+        protectedSessionSynced.current = true;
+        void loadSession({ blockUi: false });
+      }
+      return;
+    }
+
+    void loadSession({ blockUi: true }).then(() => {
+      protectedSessionSynced.current = true;
+    });
   }, [pathname, loadSession]);
 
   const establishFromTokenPayload = useCallback((res: TokenPayload): MockUser => {
     const normalized = normalizeUser(mapApiUserToMock(res.user));
+    protectedSessionSynced.current = true;
     setUser(normalized);
     persistSession(normalized, {
       accessToken: res.accessToken,
@@ -176,6 +213,7 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
   );
 
   const signOut = useCallback(async () => {
+    protectedSessionSynced.current = false;
     try {
       const tokensRaw = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
       if (tokensRaw) {

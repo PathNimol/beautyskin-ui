@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { REVENUE_DATA, WEEKLY_SALES_DATA, MOCK_PRODUCTS } from '@/lib/mock/data';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area,  } from 'recharts';
@@ -49,8 +48,7 @@ export default function ReportsClient() {
   ];
 
   return (
-    <DashboardLayout title="Reports" subtitle="Analytics and business insights">
-      {/* Period Selector */}
+    <>{/* Period Selector */}
       <div className="flex items-center gap-2 mb-6">
         {(['daily', 'weekly', 'monthly', 'yearly'] as Period[]).map(p => (
           <button
@@ -219,6 +217,6 @@ export default function ReportsClient() {
           </table>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

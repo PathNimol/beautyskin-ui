@@ -1,15 +1,7 @@
-import React from 'react';
-import ProductListingClient from '@/app/product-listing/components/ProductListingClient';
-import DashboardLayout from '@/components/DashboardLayout';
+'use client';
 
-export const metadata = {
-  title: 'Shop — BS Online Shop',
-};
+import ProductListingClient from '@/app/product-listing/components/ProductListingClient';
 
 export default function CustomerShopPage() {
-  return (
-    <DashboardLayout title="Shop" subtitle="Browse skincare from every shop on the platform">
-      <ProductListingClient embedded />
-    </DashboardLayout>
-  );
+  return <ProductListingClient embedded />;
 }

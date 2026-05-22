@@ -1,11 +1,57 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { chatApi } from '@/lib/api';
+import type { ApiChatRoom } from '@/lib/api/types';
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isRoomUuid(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
+
+const ROOM_TYPE_META: Record<string, { icon: string; color: string }> = {
+  general: { icon: 'MegaphoneIcon', color: 'bg-purple-50 text-purple-600' },
+  'shop-owners': { icon: 'BuildingStorefrontIcon', color: 'bg-rose-50 text-rose-600' },
+  staff: { icon: 'UserGroupIcon', color: 'bg-blue-50 text-blue-600' },
+  support: { icon: 'LifebuoyIcon', color: 'bg-green-50 text-green-600' },
+};
+
+function normalizeRoleForRoom(userRole: string | null | undefined): string {
+  if (!userRole) return '';
+  if (userRole === 'buyer') return 'customer';
+  return userRole;
+}
+
+function mapApiRoom(r: ApiChatRoom): ChatRoom {
+  const roomType = r.roomType || r.type || '';
+  const meta = ROOM_TYPE_META[roomType] ?? {
+    icon: 'ChatBubbleLeftRightIcon',
+    color: 'bg-rose-50 text-rose-600',
+  };
+  const roles = (r.allowedRoles || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return {
+    id: r.id,
+    name: r.name || 'Room',
+    description: roomType ? roomType.replace(/-/g, ' ') : '',
+    icon: meta.icon,
+    color: meta.color,
+    roles: roles.length ? roles : ['admin', 'owner', 'staff', 'customer', 'buyer'],
+  };
+}
+
+function roomVisibleToUser(room: ChatRoom, userRole: string | null | undefined): boolean {
+  const normalized = normalizeRoleForRoom(userRole);
+  if (!normalized) return false;
+  return room.roles.some((r) => r === normalized || r === userRole);
+}
 
 interface ChatMessage {
   id: string;
@@ -30,13 +76,6 @@ interface ChatRoom {
   roles: string[];
 }
 
-const CHAT_ROOMS: ChatRoom[] = [
-  { id: 'general', name: 'General', description: 'Platform-wide announcements', icon: 'MegaphoneIcon', color: 'bg-purple-50 text-purple-600', roles: ['admin', 'owner', 'staff', 'buyer'] },
-  { id: 'shop-owners', name: 'Shop Owners', description: 'Owner discussions & tips', icon: 'BuildingStorefrontIcon', color: 'bg-rose-50 text-rose-600', roles: ['admin', 'owner'] },
-  { id: 'staff-room', name: 'Staff Room', description: 'Staff coordination', icon: 'UserGroupIcon', color: 'bg-blue-50 text-blue-600', roles: ['admin', 'owner', 'staff'] },
-  { id: 'customer-support', name: 'Customer Support', description: 'Help & support chat', icon: 'LifebuoyIcon', color: 'bg-green-50 text-green-600', roles: ['admin', 'owner', 'staff', 'buyer'] },
-];
-
 const ROLE_COLORS: Record<string, string> = {
   admin: 'bg-purple-100 text-purple-700',
   owner: 'bg-rose-100 text-rose-700',
@@ -53,10 +92,11 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function ChatClient() {
   const { user, role } = useMockAuth();
-  const [activeRoom, setActiveRoom] = useState<ChatRoom>(CHAT_ROOMS[0]);
+  const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
   const [apiRooms, setApiRooms] = useState<ChatRoom[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [onlineCount] = useState(Math.floor(Math.random() * 8) + 3);
@@ -68,6 +108,7 @@ export default function ChatClient() {
   };
 
   const fetchMessages = useCallback(async (roomId: string) => {
+    if (!isRoomUuid(roomId)) return;
     setLoading(true);
     try {
       const page = await chatApi.listMessages(roomId);
@@ -91,27 +132,37 @@ export default function ChatClient() {
   }, []);
 
   useEffect(() => {
-    chatApi.listRooms().then((rooms) => {
-      if (rooms?.length) {
-        setApiRooms(
-          rooms.map((r) => ({
-            id: r.id,
-            name: r.name || 'Room',
-            description: r.lastMessage || '',
-            icon: 'ChatBubbleLeftRightIcon',
-            color: 'bg-rose-50 text-rose-600',
-            roles: ['admin', 'owner', 'staff', 'buyer'],
-          }))
-        );
-      }
-    }).catch(() => {});
-  }, []);
+    let cancelled = false;
+    setRoomsLoading(true);
+    chatApi
+      .listRooms()
+      .then((rooms) => {
+        if (cancelled) return;
+        const mapped = (rooms || []).map(mapApiRoom).filter((r) => isRoomUuid(r.id));
+        setApiRooms(mapped);
+        const visible = mapped.filter((r) => roomVisibleToUser(r, role));
+        setActiveRoom((current) => {
+          if (current && visible.some((r) => r.id === current.id)) return current;
+          return visible[0] ?? null;
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setApiRooms([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRoomsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
 
   useEffect(() => {
+    if (!activeRoom?.id || !isRoomUuid(activeRoom.id)) return;
     fetchMessages(activeRoom.id);
     const interval = setInterval(() => fetchMessages(activeRoom.id), 5000);
     return () => clearInterval(interval);
-  }, [activeRoom.id, fetchMessages]);
+  }, [activeRoom?.id, fetchMessages]);
 
   useEffect(() => {
     scrollToBottom();
@@ -119,7 +170,7 @@ export default function ChatClient() {
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || sending || !user) return;
+    if (!input.trim() || sending || !user || !activeRoom?.id || !isRoomUuid(activeRoom.id)) return;
     setSending(true);
     const text = input.trim();
     setInput('');
@@ -132,8 +183,7 @@ export default function ChatClient() {
     inputRef.current?.focus();
   };
 
-  const roomList = apiRooms.length ? apiRooms : CHAT_ROOMS;
-  const visibleRooms = roomList.filter(r => role && r.roles.includes(role));
+  const visibleRooms = apiRooms.filter((r) => roomVisibleToUser(r, role));
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
@@ -163,7 +213,6 @@ export default function ChatClient() {
   });
 
   return (
-    <DashboardLayout title="Chat" subtitle="Real-time messaging for all roles">
       <div className="flex gap-4 h-[calc(100vh-200px)] min-h-[500px]">
         {/* Rooms Sidebar */}
         <div className="w-64 shrink-0 bg-card border border-border rounded-2xl flex flex-col overflow-hidden">
@@ -175,12 +224,17 @@ export default function ChatClient() {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {visibleRooms.map(room => (
+            {roomsLoading ? (
+              <p className="px-3 py-4 text-xs text-muted-foreground">Loading rooms…</p>
+            ) : visibleRooms.length === 0 ? (
+              <p className="px-3 py-4 text-xs text-muted-foreground">No chat rooms available.</p>
+            ) : (
+            visibleRooms.map(room => (
               <button
                 key={room.id}
                 onClick={() => setActiveRoom(room)}
                 className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all ${
-                  activeRoom.id === room.id ? 'bg-primary/15 text-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  activeRoom?.id === room.id ? 'bg-primary/15 text-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 }`}
               >
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${room.color}`}>
@@ -191,7 +245,7 @@ export default function ChatClient() {
                   <p className="text-[10px] text-muted-foreground truncate">{room.description}</p>
                 </div>
               </button>
-            ))}
+            )))}
           </div>
         </div>
 
@@ -199,12 +253,12 @@ export default function ChatClient() {
         <div className="flex-1 bg-card border border-border rounded-2xl flex flex-col overflow-hidden">
           {/* Chat Header */}
           <div className="px-5 py-4 border-b border-border flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${activeRoom.color}`}>
-              <Icon name={activeRoom.icon as Parameters<typeof Icon>[0]['name']} size={17} />
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${activeRoom?.color ?? 'bg-secondary'}`}>
+              <Icon name={(activeRoom?.icon ?? 'ChatBubbleLeftRightIcon') as Parameters<typeof Icon>[0]['name']} size={17} />
             </div>
             <div>
-              <h3 className="font-bold text-foreground text-sm">{activeRoom.name}</h3>
-              <p className="text-xs text-muted-foreground">{activeRoom.description}</p>
+              <h3 className="font-bold text-foreground text-sm">{activeRoom?.name ?? 'Select a room'}</h3>
+              <p className="text-xs text-muted-foreground">{activeRoom?.description ?? ''}</p>
             </div>
             <div className="ml-auto flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -288,7 +342,8 @@ export default function ChatClient() {
                   type="text"
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  placeholder={`Message #${activeRoom.name.toLowerCase()}...`}
+                  placeholder={activeRoom ? `Message #${activeRoom.name.toLowerCase()}...` : 'Select a chat room…'}
+                  disabled={!activeRoom}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-12"
                   maxLength={500}
                 />
@@ -298,7 +353,7 @@ export default function ChatClient() {
               </div>
               <button
                 type="submit"
-                disabled={!input.trim() || sending}
+                disabled={!activeRoom || !input.trim() || sending}
                 className="w-11 h-11 bg-primary text-foreground rounded-xl flex items-center justify-center hover:bg-rose-deep hover:text-white transition-all shadow-rose disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 aria-label="Send message"
               >
@@ -312,6 +367,5 @@ export default function ChatClient() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

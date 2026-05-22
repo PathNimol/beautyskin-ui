@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { usePromotionsList } from '@/hooks/useApiLists';
 import { promotionsApi } from '@/lib/api';
@@ -63,8 +62,7 @@ export default function PromotionsClient() {
   };
 
   return (
-    <DashboardLayout title="Promotions" subtitle="Manage coupons, discounts, and flash sales">
-      {/* Stats */}
+    <>{/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
           { label: 'Active Promos', value: stats.active, icon: 'TagIcon', color: 'bg-green-50 text-green-600' },
@@ -238,6 +236,6 @@ export default function PromotionsClient() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { userPreferencesApi } from '@/lib/api';
 
@@ -50,7 +49,6 @@ export default function SettingsClient() {
   };
 
   return (
-    <DashboardLayout title="Settings" subtitle="Platform and account preferences">
       <div className="max-w-2xl space-y-6">
         {/* Success */}
         {saved && (
@@ -129,6 +127,5 @@ export default function SettingsClient() {
           Save Settings
         </button>
       </div>
-    </DashboardLayout>
   );
 }

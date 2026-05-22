@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { posApi, productsApi } from '@/lib/api';
@@ -198,8 +197,7 @@ export default function POSClient() {
   };
 
   return (
-    <DashboardLayout title="POS System" subtitle="Point of Sale — process walk-in sales">
-      {/* Alerts */}
+    <>{/* Alerts */}
       {successMsg && (
         <div className="mb-4 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
           <Icon name="CheckCircleIcon" size={18} className="text-green-600 shrink-0" />
@@ -490,6 +488,6 @@ export default function POSClient() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
+import { useAuthReady } from '@/hooks/useAuthReady';
+import DashboardContentSkeleton from '@/components/ui/DashboardContentSkeleton';
 import { useAnalyticsSummary } from '@/hooks/useApiLists';
 import { useRealtimeOrders, useRealtimeInventory, useRealtimeShops } from '@/hooks/useRealtimeData';
 import {
@@ -45,9 +46,10 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 
 export default function AnalyticsClient() {
   const { role } = useMockAuth();
+  const authReady = useAuthReady();
   const { data: analyticsData, loading: analyticsLoading } = useAnalyticsSummary('30d');
   const { orders, loading: ordersLoading } = useRealtimeOrders();
-  const { inventory } = useRealtimeInventory();
+  const { inventory } = useRealtimeInventory(undefined, role === 'admin');
   const { shops } = useRealtimeShops();
 
   const [staffActivity, setStaffActivity] = useState<StaffActivity[]>([]);
@@ -148,20 +150,21 @@ export default function AnalyticsClient() {
     { id: 'staff' as const, label: 'Staff Activity', icon: 'UserGroupIcon' },
   ];
 
+  if (!authReady) {
+    return <DashboardContentSkeleton />;
+  }
+
   if (role !== 'admin' && role !== 'owner') {
     return (
-      <DashboardLayout title="Analytics" subtitle="Platform analytics and insights">
-        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-          <Icon name="LockClosedIcon" size={40} className="opacity-20 mb-3" />
-          <p className="text-sm font-medium">Access restricted to admins and owners</p>
-        </div>
-      </DashboardLayout>
+      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+        <Icon name="LockClosedIcon" size={40} className="opacity-20 mb-3" />
+        <p className="text-sm font-medium">Access restricted to admins and owners</p>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout title="Analytics" subtitle="Real-time platform analytics and insights">
-      <div className="flex items-center justify-between mb-6">
+    <><div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           <span className="text-xs text-muted-foreground font-medium">Live Data</span>
@@ -361,6 +364,6 @@ export default function AnalyticsClient() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { FcGoogle } from 'react-icons/fc';
 import { FaFacebook } from 'react-icons/fa';
 import { FaTiktok } from 'react-icons/fa6';
@@ -40,6 +40,18 @@ const PROVIDERS: {
 ];
 
 export default function SocialAuthButtons({ onProvider, disabled }: SocialAuthButtonsProps) {
+  const [loading, setLoading] = useState<OAuthProvider | null>(null);
+
+  const handle = async (provider: OAuthProvider) => {
+    setLoading(provider);
+    try {
+      await onProvider(provider);
+      // Parent keeps page in loading state until navigation completes
+    } catch {
+      setLoading(null);
+    }
+  };
+
   return (
     <div className="space-y-3">
       {PROVIDERS.map((p) => {

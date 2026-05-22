@@ -11,7 +11,7 @@ import ScrollAnimationInit from '@/app/components/ScrollAnimationInit';
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-background overflow-x-hidden">
+    <main className="min-h-screen bg-background overflow-x-hidden" data-page-content>
       <ScrollAnimationInit />
 
       <Header />

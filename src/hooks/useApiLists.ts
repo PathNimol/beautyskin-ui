@@ -8,6 +8,7 @@ import {
   analyticsApi,
   dashboardApi,
 } from '@/lib/api';
+import type { AdminDashboardData } from '@/lib/api/types/adminDashboard';
 import type { ApiPromotion, ApiSupplier, ApiUser } from '@/lib/api/types';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 
@@ -127,7 +128,7 @@ export function useShopDashboard() {
 }
 
 export function useAdminDashboard() {
-  const [data, setData] = useState<Record<string, unknown> | null>(null);
+  const [data, setData] = useState<AdminDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -153,7 +154,8 @@ export function useAdminDashboard() {
 
 export function useAnalyticsSummary(range = '30d') {
   const { user } = useMockAuth();
-  const shopId = user?.shopId;
+  /** Platform admins omit shopId so the API returns platform-wide metrics. */
+  const shopId = user?.role === 'admin' ? undefined : user?.shopId;
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
 

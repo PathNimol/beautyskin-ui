@@ -14,6 +14,50 @@ function titleCaseEnum(value: string): string {
   return value.charAt(0) + value.slice(1).toLowerCase();
 }
 
+/** Maps Spring AccountStatus to UI customer status. */
+export function mapAccountStatusFromApi(status?: string): 'active' | 'inactive' | 'suspended' {
+  const s = (status || 'ACTIVE').toUpperCase();
+  if (s === 'SUSPENDED') return 'suspended';
+  if (s === 'INACTIVE' || s === 'PENDING_EMAIL_VERIFICATION') return 'inactive';
+  return 'active';
+}
+
+export function mapAccountStatusToApi(status: 'active' | 'inactive' | 'suspended'): string {
+  return status.toUpperCase();
+}
+
+export interface AdminDashboardOrderRow {
+  id: string;
+  customer: string;
+  product: string;
+  amount: number;
+  status: string;
+  date: string;
+  avatar: string;
+  avatarAlt: string;
+}
+
+export function mapApiOrderToDashboardRow(o: ApiOrder): AdminDashboardOrderRow {
+  const items = o.items ?? [];
+  const first = items[0];
+  const product = first
+    ? items.length > 1
+      ? `${first.name} +${items.length - 1} more`
+      : first.name
+    : '—';
+  const created = o.createdAt ? new Date(o.createdAt) : new Date();
+  return {
+    id: o.orderRef || o.id,
+    customer: o.customerName || '—',
+    product,
+    amount: Number(o.total) || 0,
+    status: titleCaseEnum(String(o.status)),
+    date: created.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    avatar: '',
+    avatarAlt: o.customerName || 'Customer',
+  };
+}
+
 function snakeStatus(value: string): DbInventoryItem['inv_status'] {
   const map: Record<string, DbInventoryItem['inv_status']> = {
     HEALTHY: 'healthy',

@@ -3,6 +3,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { shopStaffApi, shopsApi } from '@/lib/api';
+import { mapAccountStatusFromApi, mapAccountStatusToApi } from '@/lib/api/mappers';
 import { useRealtimeStaff } from '@/hooks/useRealtimeData';
 import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
@@ -58,11 +59,9 @@ function Toast({
 function ResetPasswordModal({
   user,
   onClose,
-  onDone,
 }: {
   user: ManagedUser;
   onClose: () => void;
-  onDone: () => void;
 }) {
   const [pw, setPw] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -71,20 +70,7 @@ function ResetPasswordModal({
   const [loading, setLoading] = useState(false);
 
   const handle = () => {
-    if (pw.length < 6) {
-      setErr('Min 6 characters');
-      return;
-    }
-    if (pw !== confirm) {
-      setErr('Passwords do not match');
-      return;
-    }
-    setErr('');
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      onDone();
-    }, 700);
+    setErr('Password reset for shop staff is not available via API yet.');
   };
 
   return (
@@ -159,32 +145,54 @@ interface Props {
   shopId: string;
 }
 
+function mapStaffRole(role: string): UserRole {
+  const r = role.toUpperCase();
+  if (r === 'OWNER') return 'Owner';
+  return 'Staff';
+}
+
+function mapStaffRoleToApi(role: UserRole): string {
+  return role === 'Owner' ? 'OWNER' : 'STAFF';
+}
+
 export default function ShopUsersClient({ shopId }: Props) {
   const [shop, setShop] = useState<{ id: string; name: string; status: string } | null>(null);
-  const { staff, refetch } = useRealtimeStaff(shopId);
-  const [allUsers, setAllUsers] = useState<ManagedUser[]>([]);
+  const { staff, refetch, removeStaffMember } = useRealtimeStaff(shopId);
 
-  useEffect(() => {
-    shopsApi.getShop(shopId).then((s) => setShop({ id: s.id, name: s.name, status: s.status })).catch(() => {});
-  }, [shopId]);
-
-  useEffect(() => {
-    setAllUsers(
+  const allUsers = useMemo(
+    () =>
       staff.map((s) => ({
         id: s.id,
         firstName: s.name.split(' ')[0] || s.name,
         lastName: s.name.split(' ').slice(1).join(' '),
         email: s.email,
         phone: s.phone || '',
-        role: (s.role === 'Owner' ? 'Owner' : 'Staff') as UserRole,
-        status: (s.status === 'Active' ? 'active' : 'inactive') as UserStatus,
-        joinDate: s.created_at,
-        lastActive: s.updated_at,
-        orders: 0,
-        totalSpent: 0,
-      }))
-    );
-  }, [staff]);
+        role: mapStaffRole(s.role),
+        status: mapAccountStatusFromApi(s.status === 'Active' ? 'ACTIVE' : 'INACTIVE'),
+        shopId,
+        shopName: shop?.name,
+        joinedAt: s.created_at
+          ? new Date(s.created_at).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })
+          : '—',
+        lastActive: s.updated_at
+          ? new Date(s.updated_at).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })
+          : '—',
+        activityLog: [] as ManagedUser['activityLog'],
+      })),
+    [staff, shopId, shop?.name]
+  );
+
+  useEffect(() => {
+    shopsApi.getShop(shopId).then((s) => setShop({ id: s.id, name: s.name, status: s.status })).catch(() => {});
+  }, [shopId]);
 
   const [search, setSearch] = useState('');
   const [roleTab, setRoleTab] = useState<UserRole | 'all'>('all');
@@ -202,14 +210,9 @@ export default function ShopUsersClient({ shopId }: Props) {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const shopUsers = useMemo(
-    () => allUsers.filter((u: ManagedUser) => u.shopId === shopId),
-    [allUsers, shopId]
-  );
-
   const filtered = useMemo(
     () =>
-      shopUsers.filter((u: ManagedUser) => {
+      allUsers.filter((u: ManagedUser) => {
         const q = search.toLowerCase();
         const matchSearch =
           !q || `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q);
@@ -217,108 +220,69 @@ export default function ShopUsersClient({ shopId }: Props) {
         const matchStatus = statusFilter === 'all' || u.status === statusFilter;
         return matchSearch && matchRole && matchStatus;
       }),
-    [shopUsers, search, roleTab, statusFilter]
+    [allUsers, search, roleTab, statusFilter]
   );
 
   const stats = useMemo(
     () => ({
-      total: shopUsers.length,
-      owners: shopUsers.filter((u: ManagedUser) => u.role === 'Owner').length,
-      staff: shopUsers.filter((u: ManagedUser) => u.role === 'Staff').length,
-      active: shopUsers.filter((u: ManagedUser) => u.status === 'active').length,
+      total: allUsers.length,
+      owners: allUsers.filter((u: ManagedUser) => u.role === 'Owner').length,
+      staff: allUsers.filter((u: ManagedUser) => u.role === 'Staff').length,
+      active: allUsers.filter((u: ManagedUser) => u.status === 'active').length,
     }),
-    [shopUsers]
+    [allUsers]
   );
 
-  const handleSave = (data: Partial<ManagedUser>) => {
-    if (formMode === 'create') {
-      const newUser: ManagedUser = {
-        id: `u${Date.now()}`,
-        firstName: data.firstName ?? '',
-        lastName: data.lastName ?? '',
-        email: data.email ?? '',
-        phone: data.phone,
-        role: (data.role as UserRole) ?? 'Staff',
-        status: data.status ?? 'active',
-        shopId,
-        shopName: shop?.name,
-        joinedAt: new Date().toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        }),
-        lastActive: '—',
-        activityLog: [
-          { action: 'Account created by admin', timestamp: new Date().toLocaleString() },
-        ],
-      };
-      setAllUsers((prev) => [...prev, newUser]);
-      showToast(`${newUser.firstName} ${newUser.lastName} added to ${shop?.name}.`);
-    } else if (editTarget) {
-      setAllUsers((prev) =>
-        prev.map((u: ManagedUser) =>
-          u.id === editTarget.id
-            ? {
-                ...u,
-                ...data,
-                activityLog: [
-                  { action: 'Profile updated by admin', timestamp: new Date().toLocaleString() },
-                  ...u.activityLog,
-                ],
-              }
-            : u
-        )
-      );
-      showToast('User updated successfully.');
+  const handleSave = async (data: Partial<ManagedUser>) => {
+    const name = `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim();
+    try {
+      if (formMode === 'create') {
+        await shopStaffApi.create(shopId, {
+          name,
+          email: data.email ?? '',
+          phone: data.phone,
+          role: mapStaffRoleToApi((data.role as UserRole) ?? 'Staff'),
+        });
+        await refetch();
+        showToast(`${name} added to ${shop?.name}.`);
+      } else if (editTarget) {
+        await shopStaffApi.update(shopId, editTarget.id, {
+          name,
+          email: data.email,
+          phone: data.phone,
+          role: data.role ? mapStaffRoleToApi(data.role as UserRole) : undefined,
+          status: data.status ? mapAccountStatusToApi(data.status) : undefined,
+        });
+        await refetch();
+        showToast('User updated successfully.');
+      }
+      setFormMode(null);
+      setEditTarget(null);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Save failed', 'error');
     }
-    setFormMode(null);
-    setEditTarget(null);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
-    setAllUsers((prev) => prev.filter((u: ManagedUser) => u.id !== deleteTarget.id));
-    showToast(`${deleteTarget.firstName} ${deleteTarget.lastName} removed.`);
-    setDeleteTarget(null);
-    if (activityUser?.id === deleteTarget.id) setActivityUser(null);
+    const ok = await removeStaffMember(deleteTarget.id);
+    if (ok) {
+      showToast(`${deleteTarget.firstName} ${deleteTarget.lastName} removed.`);
+      setDeleteTarget(null);
+      if (activityUser?.id === deleteTarget.id) setActivityUser(null);
+    } else {
+      showToast('Failed to remove user', 'error');
+    }
   };
 
-  const handleToggleStatus = (userId: string, status: UserStatus) => {
-    setAllUsers((prev) =>
-      prev.map((u: ManagedUser) =>
-        u.id === userId
-          ? {
-              ...u,
-              status,
-              activityLog: [
-                { action: `Status changed to ${status}`, timestamp: new Date().toLocaleString() },
-                ...u.activityLog,
-              ],
-            }
-          : u
-      )
-    );
-    showToast(`Status updated to ${status}.`);
-  };
-
-  const handleResetDone = () => {
-    if (!resetTarget) return;
-    setAllUsers((prev) =>
-      prev.map((u: ManagedUser) =>
-        u.id === resetTarget.id
-          ? {
-              ...u,
-              activityLog: [
-                { action: 'Password reset by admin', timestamp: new Date().toLocaleString() },
-                ...u.activityLog,
-              ],
-            }
-          : u
-      )
-    );
-    showToast('Password reset successfully.');
-    setResetTarget(null);
-    setActivityUser(null);
+  const handleToggleStatus = async (userId: string, status: UserStatus) => {
+    try {
+      await shopStaffApi.update(shopId, userId, { status: mapAccountStatusToApi(status) });
+      await refetch();
+      showToast(`Status updated to ${status}.`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Status update failed', 'error');
+    }
   };
 
   if (!shop) {
@@ -427,8 +391,8 @@ export default function ShopUsersClient({ shopId }: Props) {
               {r === 'all' ? 'All' : r}
               <span className="ml-1.5 text-[10px] opacity-70">
                 {r === 'all'
-                  ? shopUsers.length
-                  : shopUsers.filter((u: ManagedUser) => u.role === r).length}
+                  ? allUsers.length
+                  : allUsers.filter((u: ManagedUser) => u.role === r).length}
               </span>
             </button>
           ))}
@@ -585,11 +549,7 @@ export default function ShopUsersClient({ shopId }: Props) {
         />
       )}
       {resetTarget && (
-        <ResetPasswordModal
-          user={resetTarget}
-          onClose={() => setResetTarget(null)}
-          onDone={handleResetDone}
-        />
+        <ResetPasswordModal user={resetTarget} onClose={() => setResetTarget(null)} />
       )}
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </div>

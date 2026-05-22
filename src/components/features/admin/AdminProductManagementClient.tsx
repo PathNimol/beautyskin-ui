@@ -6,6 +6,8 @@ import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import ConfirmModal from '@/components/ConfirmModel';
 import { useMockAuth } from '@/contexts/MockAuthContext';
+import { useAuthReady } from '@/hooks/useAuthReady';
+import DashboardContentSkeleton from '@/components/ui/DashboardContentSkeleton';
 import { useRealtimeShops } from '@/hooks/useRealtimeData';
 import {
   computeProductStatus,
@@ -112,6 +114,7 @@ function productToForm(p: DbProductRow | null): FormState {
 
 export default function AdminProductManagementClient({ shopId }: { shopId: string }) {
   const { role } = useMockAuth();
+  const authReady = useAuthReady();
   const { shops } = useRealtimeShops();
   const shop = shops.find((s) => s.id === shopId);
 
@@ -324,6 +327,14 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
       );
     }
   };
+
+  if (!authReady) {
+    return (
+      <div className="p-8">
+        <DashboardContentSkeleton />
+      </div>
+    );
+  }
 
   if (role !== 'admin') {
     return (

@@ -165,6 +165,7 @@ export default function ProductListingClient({ embedded = false }: { embedded?: 
   const [activePriceRange, setActivePriceRange] = useState(0);
   const [activeSort, setActiveSort] = useState<string>('Featured');
   const [cartAdded, setCartAdded] = useState<string[]>([]);
+  const [addingId, setAddingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Debounce search input
@@ -235,7 +236,7 @@ export default function ProductListingClient({ embedded = false }: { embedded?: 
   const { products, loading, error, page, setPage, totalElements, totalPages, pageSize } =
     useCatalogProducts(catalogParams);
 
-  const productDetailBase = '/customer/products';
+  const productDetailBase = embedded ? '/customer/products' : '/product-detail';
 
   const handlePageChange = useCallback(
     (next: number) => {
@@ -248,23 +249,26 @@ export default function ProductListingClient({ embedded = false }: { embedded?: 
   );
 
   const handleAddToCart = useCallback(
-    (product: CatalogProduct, e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
+    async (product: CatalogProduct) => {
       if (!product.inStock || product.stock === 0) return;
-      addItem({
-        id: product.id,
-        productId: product.id,
-        name: product.name,
-        brand: product.brand,
-        price: product.price,
-        image: product.image,
-        alt: product.alt,
-        shopId: product.shopId,
-        shopName: product.shopName,
-      });
-      setCartAdded((prev) => [...prev, product.id]);
-      setTimeout(() => setCartAdded((prev) => prev.filter((x) => x !== product.id)), 2000);
+      setAddingId(product.id);
+      try {
+        await addItem({
+          id: product.id,
+          productId: product.id,
+          name: product.name,
+          brand: product.brand,
+          price: product.price,
+          image: product.image,
+          alt: product.alt,
+          shopId: product.shopId,
+          shopName: product.shopName,
+        });
+        setCartAdded((prev) => [...prev, product.id]);
+        setTimeout(() => setCartAdded((prev) => prev.filter((x) => x !== product.id)), 2000);
+      } finally {
+        setAddingId((current) => (current === product.id ? null : current));
+      }
     },
     [addItem]
   );
@@ -308,7 +312,7 @@ export default function ProductListingClient({ embedded = false }: { embedded?: 
         </div>
       )}
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className={`mx-auto max-w-7xl px-6 pt-8 ${embedded ? 'pb-16 md:pb-24' : 'pb-12 md:pb-16'}`}>
         {/* ── Search + shop dropdown ── */}
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center">
           <div className="relative flex-1">
@@ -382,11 +386,11 @@ export default function ProductListingClient({ embedded = false }: { embedded?: 
         )}
 
         {/* ── Main layout: flex-col so pagination spans full width below ── */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 pb-4">
           <div className="flex items-start gap-8">
             {/* ── Desktop sidebar ── */}
-            <aside className="hidden w-60 shrink-0 md:block">
-              <div className="max-h-svh overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-card">
+            <aside className="hidden w-60 shrink-0 md:block sticky top-24 self-start">
+              <div className="max-h-[calc(100vh-7rem)] overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-card">
                 <div className="space-y-6">
                   {/* Category */}
                   <div>
@@ -562,7 +566,7 @@ export default function ProductListingClient({ embedded = false }: { embedded?: 
             )}
 
             {/* ── Product grid ── */}
-            <div id="catalog-grid-top" className="min-w-0 flex-1 h-[720px] overflow-y-auto pr-1">
+            <div id="catalog-grid-top" className="min-w-0 flex-1">
               <div className="mb-5">
                 <p className="text-sm text-muted-foreground">
                   <span className="text-lg font-extrabold text-foreground">{totalElements}</span>{' '}
@@ -608,88 +612,102 @@ export default function ProductListingClient({ embedded = false }: { embedded?: 
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                  {products.map((product) => (
-                    <Link
-                      key={product.id}
-                      href={`${productDetailBase}/${product.id}`}
-                      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-rose"
-                    >
-                      <div className="relative h-56 overflow-hidden bg-secondary">
-                        <AppImage
-                          src={product.image}
-                          alt={product.alt}
-                          fill
-                          sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                        {product.badge && (
-                          <span
-                            className={`absolute left-3 top-3 rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${badgeStyles[product.badgeType ?? 'rose']}`}
-                          >
-                            {product.badge}
-                          </span>
-                        )}
-                        {!product.inStock && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-foreground/50 backdrop-blur-[2px]">
-                            <span className="rounded-lg bg-card px-3 py-1.5 text-xs font-bold">
-                              Out of stock
+                  {products.map((product) => {
+                    const detailHref = `${productDetailBase}/${product.id}`;
+                    const isAdding = addingId === product.id;
+                    const isAdded = cartAdded.includes(product.id);
+
+                    return (
+                      <article
+                        key={product.id}
+                        className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-rose"
+                      >
+                        <Link href={detailHref} className="block">
+                          <div className="relative h-56 overflow-hidden bg-secondary">
+                            <AppImage
+                              src={product.image}
+                              alt={product.alt}
+                              fill
+                              sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                              className="object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                            {product.badge && (
+                              <span
+                                className={`absolute left-3 top-3 rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${badgeStyles[product.badgeType ?? 'rose']}`}
+                              >
+                                {product.badge}
+                              </span>
+                            )}
+                            {!product.inStock && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-foreground/50 backdrop-blur-[2px]">
+                                <span className="rounded-lg bg-card px-3 py-1.5 text-xs font-bold">
+                                  Out of stock
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </Link>
+                        <div className="flex flex-1 flex-col px-4 pt-4 pb-6">
+                          <Link href={detailHref} className="block">
+                            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-accent">
+                              {product.brand}
+                            </p>
+                            <h3 className="mb-2 line-clamp-2 text-sm font-bold leading-snug text-foreground group-hover:text-rose-deep">
+                              {product.name}
+                            </h3>
+                          </Link>
+                          <div className="mb-2 flex items-center gap-2">
+                            <StarRating rating={product.rating} />
+                            <span className="text-xs text-muted-foreground">
+                              {product.rating} ({product.reviews.toLocaleString()})
                             </span>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex flex-1 flex-col p-4">
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-accent">
-                          {product.brand}
-                        </p>
-                        <h3 className="mb-2 line-clamp-2 text-sm font-bold leading-snug text-foreground group-hover:text-rose-deep">
-                          {product.name}
-                        </h3>
-                        <div className="mb-2 flex items-center gap-2">
-                          <StarRating rating={product.rating} />
-                          <span className="text-xs text-muted-foreground">
-                            {product.rating} ({product.reviews.toLocaleString()})
-                          </span>
-                        </div>
-                        {product.shopName && (
-                          <p className="mb-2 text-[10px] text-muted-foreground">
-                            {product.shopName}
-                          </p>
-                        )}
-                        <div className="mt-auto flex items-baseline gap-2 pt-2">
-                          <span className="text-xl font-extrabold text-foreground">
-                            ${product.price.toFixed(2)}
-                          </span>
-                          {product.originalPrice != null && (
-                            <span className="text-xs text-muted-foreground line-through">
-                              ${product.originalPrice.toFixed(2)}
+                          {product.shopName && (
+                            <p className="mb-2 text-[10px] text-muted-foreground">
+                              {product.shopName}
+                            </p>
+                          )}
+                          <div className="mt-auto flex items-baseline gap-2 pt-2">
+                            <span className="text-xl font-extrabold text-foreground">
+                              ${product.price.toFixed(2)}
                             </span>
-                          )}
+                            {product.originalPrice != null && (
+                              <span className="text-xs text-muted-foreground line-through">
+                                ${product.originalPrice.toFixed(2)}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleAddToCart(product)}
+                            disabled={!product.inStock || isAdding}
+                            className={`mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all ${
+                              !product.inStock
+                                ? 'cursor-not-allowed bg-muted text-muted-foreground'
+                                : isAdded
+                                  ? 'bg-green-600 text-white'
+                                  : 'bg-primary text-foreground shadow-rose hover:bg-rose-deep hover:text-white'
+                            }`}
+                          >
+                            {isAdding ? (
+                              <>
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                                Adding…
+                              </>
+                            ) : isAdded ? (
+                              <>
+                                <Icon name="CheckIcon" size={15} /> Added
+                              </>
+                            ) : (
+                              <>
+                                <Icon name="ShoppingBagIcon" size={15} /> Add to cart
+                              </>
+                            )}
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={(e) => handleAddToCart(product, e)}
-                          disabled={!product.inStock}
-                          className={`mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all ${
-                            !product.inStock
-                              ? 'cursor-not-allowed bg-muted text-muted-foreground'
-                              : cartAdded.includes(product.id)
-                                ? 'bg-green-600 text-white'
-                                : 'bg-primary text-foreground shadow-rose hover:bg-rose-deep hover:text-white'
-                          }`}
-                        >
-                          {cartAdded.includes(product.id) ? (
-                            <>
-                              <Icon name="CheckIcon" size={15} /> Added
-                            </>
-                          ) : (
-                            <>
-                              <Icon name="ShoppingBagIcon" size={15} /> Add to cart
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </Link>
-                  ))}
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </div>

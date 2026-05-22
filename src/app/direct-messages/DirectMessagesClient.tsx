@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useMockAuth } from '@/contexts/MockAuthContext';
@@ -206,7 +205,6 @@ export default function DirectMessagesClient() {
   };
 
   return (
-    <DashboardLayout title="Direct Messages" subtitle="Private one-to-one messaging">
       <div className="flex gap-4 h-[calc(100vh-200px)] min-h-[500px]">
         {/* Left Panel: Conversations + User Search */}
         <div className="w-72 shrink-0 bg-card border border-border rounded-2xl flex flex-col overflow-hidden">
@@ -430,6 +428,5 @@ export default function DirectMessagesClient() {
           )}
         </div>
       </div>
-    </DashboardLayout>
   );
 }
