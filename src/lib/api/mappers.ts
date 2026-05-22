@@ -1,11 +1,13 @@
 import type { MockUser, Order, Product, CustomerShipping } from '@/lib/mock/data';
+import type { DbInventoryItem, DbNotification, DbOrder, DbShop } from '@/hooks/useRealtimeData';
 import type {
-  DbInventoryItem,
-  DbNotification,
-  DbOrder,
-  DbShop,
-} from '@/hooks/useRealtimeData';
-import type { ApiOrder, ApiProduct, ApiShop, ApiUser, ApiInventoryItem, ApiNotification } from './types';
+  ApiOrder,
+  ApiProduct,
+  ApiShop,
+  ApiUser,
+  ApiInventoryItem,
+  ApiNotification,
+} from './types';
 import type { CatalogProduct } from '@/lib/mock/productCatalog';
 import { isValidProductImage, resolveProductImageUrl } from './productImage';
 
@@ -211,7 +213,7 @@ export function mapApiNotification(n: ApiNotification): DbNotification {
   return {
     id: n.id,
     shop_id: n.shopId ?? null,
-    type: n.type as DbNotification['type'],
+    type: (n.type?.toLowerCase() as DbNotification['type']) ?? 'system',
     title: n.title,
     message: n.message,
     is_read: n.read,

@@ -1,13 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  customersApi,
-  suppliersApi,
-  promotionsApi,
-  analyticsApi,
-  dashboardApi,
-} from '@/lib/api';
+import { customersApi, suppliersApi, promotionsApi, analyticsApi, dashboardApi } from '@/lib/api';
 import type { AdminDashboardData } from '@/lib/api/types/adminDashboard';
 import type { ApiPromotion, ApiSupplier, ApiUser } from '@/lib/api/types';
 import { useMockAuth } from '@/contexts/MockAuthContext';
@@ -138,7 +132,8 @@ export function useAdminDashboard() {
       .then((d) => {
         if (!cancelled) setData(d);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('adminDashboard error:', err); // ← add this
         if (!cancelled) setData(null);
       })
       .finally(() => {

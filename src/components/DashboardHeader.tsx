@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { useRealtimeNotifications, type DbNotification } from '@/hooks/useRealtimeData';
 import type { UserRole } from '@/lib/mock/data';
@@ -24,6 +25,7 @@ const NOTIF_ICON: Record<DbNotification['type'], string> = {
   promotion: 'TagIcon',
   review: 'StarIcon',
   system: 'BellIcon',
+  shop_approval: 'BuildingStorefrontIcon',
 };
 
 const NOTIF_COLOR: Record<DbNotification['type'], string> = {
@@ -33,6 +35,7 @@ const NOTIF_COLOR: Record<DbNotification['type'], string> = {
   promotion: 'bg-purple-50 text-purple-500',
   review: 'bg-blue-50 text-blue-500',
   system: 'bg-secondary text-muted-foreground',
+  shop_approval: 'bg-amber-50 text-amber-600',
 };
 
 function profileHref(role: UserRole | null): string {
@@ -68,16 +71,24 @@ function NotifToast({ notif, onDismiss }: { notif: DbNotification; onDismiss: ()
   );
 }
 
+// ─── Dashboard Header ─────────────────────────────────────────────────────────
 export default function DashboardHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   const { user, role, signOut } = useMockAuth();
   const router = useRouter();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
 
   const { notifications, unreadCount, toastQueue, markAsRead, markAllAsRead, dismissToast } =
     useRealtimeNotifications();
 
   const handleSignOut = () => {
+    setProfileOpen(false);
+    setSignOutOpen(true);
+  };
+
+  const handleConfirmSignOut = () => {
+    setSignOutOpen(false);
     signOut();
     router.push('/login');
   };
@@ -148,7 +159,9 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
                       <div
                         key={n.id}
                         onClick={() => markAsRead(n.id)}
-                        className={`px-5 py-3.5 hover:bg-secondary transition-all cursor-pointer ${!n.is_read ? 'bg-primary/5' : ''}`}
+                        className={`px-5 py-3.5 hover:bg-secondary transition-all cursor-pointer ${
+                          !n.is_read ? 'bg-primary/5' : ''
+                        }`}
                       >
                         <div className="flex items-start gap-3">
                           <div
@@ -227,7 +240,6 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
 
             {profileOpen && (
               <div className="absolute right-0 top-11 w-52 bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden">
-                {/* Click name/email → go to profile */}
                 <Link
                   href={profileHref(role)}
                   onClick={() => setProfileOpen(false)}
@@ -269,6 +281,19 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
           </div>
         </div>
       </header>
+
+      {/* Sign Out Confirmation Dialog */}
+      <ConfirmDialog
+        open={signOutOpen}
+        title="Sign Out"
+        description="Are you sure you want to sign out? You'll need to sign in again to access your account."
+        confirmLabel="Sign Out"
+        cancelLabel="Cancel"
+        variant="danger"
+        icon="ArrowRightOnRectangleIcon"
+        onConfirm={handleConfirmSignOut}
+        onCancel={() => setSignOutOpen(false)}
+      />
 
       {/* Toast Stack */}
       {toastQueue.length > 0 && (

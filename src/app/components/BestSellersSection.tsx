@@ -105,8 +105,8 @@ export default function BestSellersSection() {
           <p className="text-sm text-amber-800 mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
             Live catalog unavailable ({error}). Showing preview products — start the API at{' '}
             <code className="text-xs">http://localhost:8080</code> (see{' '}
-            <code className="text-xs">NEXT_PUBLIC_API_URL</code> in <code className="text-xs">.env</code>) for
-            cart and product pages.
+            <code className="text-xs">NEXT_PUBLIC_API_URL</code> in{' '}
+            <code className="text-xs">.env</code>) for cart and product pages.
           </p>
         )}
 

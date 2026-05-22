@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import DashboardPageOutlet from '@/components/dashboard/DashboardPageOutlet';
 import { usePathname, useRouter } from 'next/navigation';
-import DashboardSidebar from '@/components/DashboardSidebar';
+import DashboardSidebar from './features/dashboard/sidebar';
 import DashboardHeader from '@/components/DashboardHeader';
 import DashboardShellSkeleton from '@/components/ui/DashboardShellSkeleton';
 import { DashboardNavProvider, useDashboardNav } from '@/contexts/DashboardNavContext';

@@ -66,12 +66,12 @@ Run **`yarn type-check`** and **`yarn lint`** before sign-off if you are mentori
 
 Open **`/login`**. The page lists **demo accounts** (email / password / redirect). Sign in as each role and confirm the **post-login landing** and **sidebar** match the role.
 
-| Role   | Example email           | Example password | Typical first screen   |
-|--------|-------------------------|------------------|-------------------------|
-| Admin  | `admin@beautyskin.com`  | `admin123`       | `/admin/dashboard`     |
-| Owner  | `owner@beautyskin.com`  | `owner123`       | `/owner/dashboard`      |
-| Staff  | `staff@beautyskin.com`  | `staff123`       | `/staff/dashboard`      |
-| Buyer  | `buyer@beautyskin.com`  | `buyer123`       | `/customer/account`     |
+| Role  | Example email          | Example password | Typical first screen |
+| ----- | ---------------------- | ---------------- | -------------------- |
+| Admin | `admin@beautyskin.com` | `admin123`       | `/admin/dashboard`   |
+| Owner | `owner@beautyskin.com` | `owner123`       | `/owner/dashboard`   |
+| Staff | `staff@beautyskin.com` | `staff123`       | `/staff/dashboard`   |
+| Buyer | `buyer@beautyskin.com` | `buyer123`       | `/customer/account`  |
 
 **OTP demo (login flow):** when prompted, use **`123456`** as the mock OTP.
 
@@ -81,40 +81,44 @@ Also test **`/register`** and **`/forgot-password`** for basic form and navigati
 
 After login, use the **dashboard sidebar** (or admin sidebar for admin) and verify each link **loads without a blank error page**. Spot-check interactions (filters, modals, navigation).
 
-**Admin (`admin` role)**  
-- Dashboard, analytics, reports, orders (`/admin/*`).  
-- **Shops:** `/admin/all-shops`, `/admin/shops`, `/admin-shops` (legacy URL; same shop management client as `/admin/shops`).  
-- **Customers:** `/admin/customers`.  
-- **Products (Supabase):** `/admin/products` → pick a shop → `/admin/shops/[shopId]/products` (catalog, soft delete, restore, categories/brands, stock purchases, images).  
-- **Per-shop users:** `/admin/shops/[shopId]/users`.  
+**Admin (`admin` role)**
+
+- Dashboard, analytics, reports, orders (`/admin/*`).
+- **Shops:** `/admin/all-shops`, `/admin/shops`, `/admin-shops` (legacy URL; same shop management client as `/admin/shops`).
+- **Customers:** `/admin/customers`.
+- **Products (Supabase):** `/admin/products` → pick a shop → `/admin/shops/[shopId]/products` (catalog, soft delete, restore, categories/brands, stock purchases, images).
+- **Per-shop users:** `/admin/shops/[shopId]/users`.
 - **Chat / Direct messages / Settings** where linked from admin UI.
 
-**Owner (`owner` role)**  
-- Dashboard, products, inventory, orders, POS, staff, suppliers, purchases, customers, promotions, reports, analytics.  
+**Owner (`owner` role)**
+
+- Dashboard, products, inventory, orders, POS, staff, suppliers, purchases, customers, promotions, reports, analytics.
 - Staff page may reuse shop management patterns.
 
-**Staff (`staff` role)**  
-- Dashboard, products, inventory, orders, POS, revoke requests.  
+**Staff (`staff` role)**
+
+- Dashboard, products, inventory, orders, POS, revoke requests.
 - Shared chat, DMs, settings.
 
-**Customer / buyer (`buyer` role)**  
-- Account, shop (product listing), cart, chat, direct messages.  
+**Customer / buyer (`buyer` role)**
+
+- Account, shop (product listing), cart, chat, direct messages.
 - Also exercise **`/customer-account`** (or `/customer/account` per nav) for profile and order-style tabs if present.
 
 ### 8. Public storefront (signed out or extra tabs)
 
-- **`/`** — marketing home.  
-- **`/product-listing`**, **`/product-detail/[id]`** — browse product-style pages (often mock-driven).  
-- **`/cart`**, **`/checkout`** — checkout flow UI.  
+- **`/`** — marketing home.
+- **`/product-listing`**, **`/product-detail/[id]`** — browse product-style pages (often mock-driven).
+- **`/cart`**, **`/checkout`** — checkout flow UI.
 - **`/shops`** — shop listing (same underlying shop client as admin all-shops when authenticated layout differs).
 
 ### 9. Sign-off criteria for mentors
 
-- [ ] Install and `yarn dev` succeed on a clean clone.  
-- [ ] `.env.local` documented for mentees; Supabase optional path explained.  
-- [ ] All four mock roles log in and reach their dashboard.  
-- [ ] Each role’s main sidebar destinations load.  
-- [ ] If Supabase is configured: at least one **shop** and **admin product** path reads/writes without RLS surprises.  
+- [ ] Install and `yarn dev` succeed on a clean clone.
+- [ ] `.env.local` documented for mentees; Supabase optional path explained.
+- [ ] All four mock roles log in and reach their dashboard.
+- [ ] Each role’s main sidebar destinations load.
+- [ ] If Supabase is configured: at least one **shop** and **admin product** path reads/writes without RLS surprises.
 - [ ] `yarn build` succeeds before merge (production compile).
 
 ---
@@ -125,29 +129,29 @@ Use this section to **decide what to extend next**; it reflects the current code
 
 ### Platform model
 
-- **Multi-role beauty e-commerce platform**: separate experiences for **platform admin**, **shop owner**, **shop staff**, and **customers**.  
-- **Auth:** primarily **`MockAuthContext`** (localStorage session + cookie) with fixed demo users in `src/lib/mock/data.ts`. **`AuthContext`** exists for Supabase Auth patterns but is not the main login path for the demo sidebar.  
+- **Multi-role beauty e-commerce platform**: separate experiences for **platform admin**, **shop owner**, **shop staff**, and **customers**.
+- **Auth:** primarily **`MockAuthContext`** (localStorage session + cookie) with fixed demo users in `src/lib/mock/data.ts`. **`AuthContext`** exists for Supabase Auth patterns but is not the main login path for the demo sidebar.
 - **Data:** mix of **mock JSON** (POS, many product UIs, chat content) and **Supabase** (shops, realtime inventory/orders hooks, admin product management, etc., when env vars are present).
 
 ### Storefront and customer experience
 
-- Marketing landing, category-style sections, product listing and detail views.  
-- Shopping cart and checkout-style pages (including customer-scoped routes under `/customer/*`).  
+- Marketing landing, category-style sections, product listing and detail views.
+- Shopping cart and checkout-style pages (including customer-scoped routes under `/customer/*`).
 - Customer account areas: profile-style editing, order history / tracking UI (some data mock or hybrid).
 
 ### Shop operations (owner / staff)
 
-- **Dashboards** with KPI-style cards.  
-- **Products & inventory** UIs (many views use mock products; align with Supabase when migrating).  
-- **Orders** list and detail patterns.  
-- **POS** interface (mock products, cart, receipt-style flow).  
-- **Staff** management entry points; **revoke requests** for staff.  
+- **Dashboards** with KPI-style cards.
+- **Products & inventory** UIs (many views use mock products; align with Supabase when migrating).
+- **Orders** list and detail patterns.
+- **POS** interface (mock products, cart, receipt-style flow).
+- **Staff** management entry points; **revoke requests** for staff.
 - **Suppliers / purchases / promotions / reports / analytics** pages (largely UI + mock or partial integrations—verify per file before assuming backend persistence).
 
 ### Platform administration
 
-- Admin dashboard, **shop registry** (list, filter, add shop, change status), **platform orders**, **customers**, **analytics**, **reports**.  
-- **Admin products** (per shop): CRUD-style product forms, soft delete / restore, categories and brands per shop, supplier stock events, image URL + optional Storage uploads to a `product-images` bucket.  
+- Admin dashboard, **shop registry** (list, filter, add shop, change status), **platform orders**, **customers**, **analytics**, **reports**.
+- **Admin products** (per shop): CRUD-style product forms, soft delete / restore, categories and brands per shop, supplier stock events, image URL + optional Storage uploads to a `product-images` bucket.
 - **Per-shop user management** screen for admin (`ShopUsersClient`).
 
 ### Collaboration
@@ -156,26 +160,26 @@ Use this section to **decide what to extend next**; it reflects the current code
 
 ### Backend / infra in repo
 
-- **Supabase SQL migrations** under `supabase/migrations/` (schema for shops, products, inventory, orders, staff, notifications, analytics tables, admin product extensions, etc.).  
+- **Supabase SQL migrations** under `supabase/migrations/` (schema for shops, products, inventory, orders, staff, notifications, analytics tables, admin product extensions, etc.).
 - **Edge function** example: `supabase/functions/send-email/`.
 
 ### Good candidates for “what to add next”
 
-- Deeper **Supabase Auth** replacing or complementing mock login.  
-- **End-to-end** product lifecycle on Supabase for owner/staff (not only admin).  
-- **Payment** integration on checkout.  
-- **Email / notifications** wired to real providers.  
-- **Tests** (Playwright for mentor checklist, Vitest for hooks).  
-- **API route** layer (`app/api`) for secrets instead of open RLS demo policies.  
+- Deeper **Supabase Auth** replacing or complementing mock login.
+- **End-to-end** product lifecycle on Supabase for owner/staff (not only admin).
+- **Payment** integration on checkout.
+- **Email / notifications** wired to real providers.
+- **Tests** (Playwright for mentor checklist, Vitest for hooks).
+- **API route** layer (`app/api`) for secrets instead of open RLS demo policies.
 - **i18n** and **accessibility** audit.
 
 ---
 
 ## Tech stack (high level)
 
-- **Next.js 15** (App Router), **React 19**, **TypeScript**  
-- **Tailwind CSS**  
-- **Supabase** (`@supabase/ssr`, `@supabase/supabase-js`) for optional live data  
+- **Next.js 15** (App Router), **React 19**, **TypeScript**
+- **Tailwind CSS**
+- **Supabase** (`@supabase/ssr`, `@supabase/supabase-js`) for optional live data
 - **Recharts** (analytics-style pages)
 
 ---
@@ -246,15 +250,15 @@ Tailwind CSS: utility-first styling, custom theme in `tailwind.config.js`, PostC
 
 ## Available scripts
 
-| Script            | Description                          |
-|-------------------|--------------------------------------|
-| `yarn dev`        | Dev server (port **4028**)           |
-| `yarn build`      | Production build                     |
+| Script            | Description                            |
+| ----------------- | -------------------------------------- |
+| `yarn dev`        | Dev server (port **4028**)             |
+| `yarn build`      | Production build                       |
 | `yarn serve`      | Start production server (`next start`) |
-| `yarn lint`       | ESLint                               |
-| `yarn lint:fix`   | ESLint with auto-fix                 |
-| `yarn format`     | Prettier                             |
-| `yarn type-check` | TypeScript (`tsc --noEmit`)          |
+| `yarn lint`       | ESLint                                 |
+| `yarn lint:fix`   | ESLint with auto-fix                   |
+| `yarn format`     | Prettier                               |
+| `yarn type-check` | TypeScript (`tsc --noEmit`)            |
 
 ---
 
@@ -270,14 +274,14 @@ Configure environment variables on the host (see mentor guide above).
 
 ## Learn more
 
-- [Next.js Documentation](https://nextjs.org/docs)  
-- [Learn Next.js](https://nextjs.org/learn)  
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Learn Next.js](https://nextjs.org/learn)
 - [Next.js GitHub](https://github.com/vercel/next.js)
 
 ---
 
 ## Acknowledgments
 
-- Built with [Rocket.new](https://rocket.new)  
-- Powered by Next.js and React  
+- Built with [Rocket.new](https://rocket.new)
+- Powered by Next.js and React
 - Styled with Tailwind CSS

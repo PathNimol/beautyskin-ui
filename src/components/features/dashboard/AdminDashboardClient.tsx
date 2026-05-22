@@ -234,7 +234,7 @@ export default function AdminDashboardClient() {
   const lineSecondaryKey = chartPeriod === 'monthly' ? 'orders' : 'returns';
 
   return (
-    <div className="p-6 md:p-8 min-h-screen bg-admin-bg">
+    <div className="p-6 md:p-8 min-h-screen bg-admin-bg ">
       {/* ── Top Bar ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-8">
         <div className="pl-10 md:pl-0">
@@ -391,8 +391,16 @@ export default function AdminDashboardClient() {
                       : ['Day', 'Sales ($)', 'Cancelled'],
                     lineChartData.map((d) =>
                       chartPeriod === 'monthly'
-                        ? [d.month, (d as { revenue: number }).revenue, (d as { orders: number }).orders]
-                        : [d.day, (d as { sales: number }).sales, (d as { returns: number }).returns]
+                        ? [
+                            'month' in d ? d.month : '',
+                            (d as { revenue: number }).revenue,
+                            (d as { orders: number }).orders,
+                          ]
+                        : [
+                            'day' in d ? d.day : '',
+                            (d as { sales: number }).sales,
+                            (d as { returns: number }).returns,
+                          ]
                     )
                   )
                 }
@@ -406,12 +414,12 @@ export default function AdminDashboardClient() {
                       lineChartData.map((d) =>
                         chartPeriod === 'monthly'
                           ? [
-                              d.month,
+                              'month' in d ? d.month : '',
                               `$${(d as { revenue: number }).revenue.toLocaleString()}`,
                               (d as { orders: number }).orders,
                             ]
                           : [
-                              d.day,
+                              'day' in d ? d.day : '',
                               `$${(d as { sales: number }).sales.toLocaleString()}`,
                               (d as { returns: number }).returns,
                             ]
@@ -650,13 +658,19 @@ export default function AdminDashboardClient() {
                 <tbody>
                   {adminLoading ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-sm text-muted-foreground">
+                      <td
+                        colSpan={5}
+                        className="px-6 py-12 text-center text-sm text-muted-foreground"
+                      >
                         Loading recent orders…
                       </td>
                     </tr>
                   ) : displayRecentOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-sm text-muted-foreground">
+                      <td
+                        colSpan={5}
+                        className="px-6 py-12 text-center text-sm text-muted-foreground"
+                      >
                         No orders yet.
                       </td>
                     </tr>
@@ -821,7 +835,9 @@ export default function AdminDashboardClient() {
             </div>
             <div className="flex flex-col gap-4">
               {topProducts.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-6 text-center">No product sales yet.</p>
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  No product sales yet.
+                </p>
               ) : (
                 topProducts.map((product, i) => (
                   <div key={product.name} className="flex flex-col gap-1.5">

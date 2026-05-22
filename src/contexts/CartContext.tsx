@@ -64,7 +64,7 @@ function mapApiCartItem(i: ApiCartItem): CartItem {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useMockAuth();
+  const { isAuthenticated, loading: authLoading } = useMockAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [discount, setDiscount] = useState(0);
@@ -99,8 +99,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, loadLocal]);
 
   useEffect(() => {
+    if (authLoading) return;
     refreshCart();
-  }, [refreshCart, isAuthenticated]);
+  }, [refreshCart, isAuthenticated, authLoading]);
 
   const persistLocal = useCallback((next: CartItem[]) => {
     setItems(next);

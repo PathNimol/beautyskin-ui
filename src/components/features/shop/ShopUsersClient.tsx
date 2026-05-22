@@ -56,13 +56,7 @@ function Toast({
 }
 
 // ─── Reset Password Modal ─────────────────────────────────────────────────────
-function ResetPasswordModal({
-  user,
-  onClose,
-}: {
-  user: ManagedUser;
-  onClose: () => void;
-}) {
+function ResetPasswordModal({ user, onClose }: { user: ManagedUser; onClose: () => void }) {
   const [pw, setPw] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -191,7 +185,10 @@ export default function ShopUsersClient({ shopId }: Props) {
   );
 
   useEffect(() => {
-    shopsApi.getShop(shopId).then((s) => setShop({ id: s.id, name: s.name, status: s.status })).catch(() => {});
+    shopsApi
+      .getShop(shopId)
+      .then((s) => setShop({ id: s.id, name: s.name, status: s.status }))
+      .catch(() => {});
   }, [shopId]);
 
   const [search, setSearch] = useState('');
@@ -308,7 +305,9 @@ export default function ShopUsersClient({ shopId }: Props) {
           Shops
         </Link>
         <Icon name="ChevronRightIcon" size={12} />
-        <span className="text-foreground font-semibold">{shop.name}</span>
+        <Link href={`/admin/shops/`} className="text-foreground font-semibold">
+          {shop.name}
+        </Link>
         <Icon name="ChevronRightIcon" size={12} />
         <span className="text-foreground font-semibold">Users</span>
       </div>

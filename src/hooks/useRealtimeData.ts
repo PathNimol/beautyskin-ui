@@ -52,7 +52,14 @@ export interface DbOrder {
   subtotal: number;
   shipping: number;
   discount: number;
-  order_status: 'Pending' | 'Confirmed' | 'Packing' | 'Shipping' | 'Delivered' | 'Cancelled' | 'Returned';
+  order_status:
+    | 'Pending'
+    | 'Confirmed'
+    | 'Packing'
+    | 'Shipping'
+    | 'Delivered'
+    | 'Cancelled'
+    | 'Returned';
   payment_method: string;
   pay_status: 'Paid' | 'Pending' | 'Refunded';
   address: string;
@@ -101,14 +108,20 @@ export interface DbStaff {
 export interface DbNotification {
   id: string;
   shop_id: string | null;
-  type: 'new_order' | 'low_stock' | 'expiry_alert' | 'promotion' | 'review' | 'system';
+  type:
+    | 'new_order'
+    | 'low_stock'
+    | 'expiry_alert'
+    | 'promotion'
+    | 'review'
+    | 'system'
+    | 'shop_approval';
   title: string;
   message: string;
   is_read: boolean;
   metadata: Record<string, unknown>;
   created_at: string;
 }
-
 export function useRealtimeInventory(shopIdOverride?: string, platformWide = false) {
   const { shopId: authShopId, role, isAuthenticated } = useMockAuth();
   const shopId =
@@ -116,7 +129,7 @@ export function useRealtimeInventory(shopIdOverride?: string, platformWide = fal
       ? undefined
       : role === 'admin'
         ? shopIdOverride
-        : shopIdOverride ?? authShopId ?? undefined;
+        : (shopIdOverride ?? authShopId ?? undefined);
   const [inventory, setInventory] = useState<DbInventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -247,7 +260,15 @@ export function useRealtimeOrders(shopIdOverride?: string) {
     revenue: orders.filter((o) => o.pay_status === 'Paid').reduce((s, o) => s + Number(o.total), 0),
   };
 
-  return { orders, loading, error, stats, updateOrderStatus, bulkUpdateStatus, refetch: fetchOrders };
+  return {
+    orders,
+    loading,
+    error,
+    stats,
+    updateOrderStatus,
+    bulkUpdateStatus,
+    refetch: fetchOrders,
+  };
 }
 
 export function useRealtimeShops() {
@@ -303,11 +324,11 @@ export function useRealtimeStaff(shopId?: string) {
           email: u.email,
           phone: u.phone || '',
           role: (u.role.charAt(0) + u.role.slice(1).toLowerCase()) as DbStaff['role'],
-          avatar: '',
-          avatar_alt: u.name,
+          avatar: u.avatar || '',
+          avatar_alt: u.avatarAlt || u.name,
           status: u.status === 'ACTIVE' ? 'Active' : 'Inactive',
-          created_at: u.createdAt || '',
-          updated_at: u.createdAt || '',
+          created_at: '',
+          updated_at: '',
         }))
       );
     } catch (err: unknown) {
@@ -371,7 +392,16 @@ export function useRealtimeStaff(shopId?: string) {
     fetchStaff();
   }, [fetchStaff]);
 
-  return { staff, loading, error, inserting, batchInsertStaff, removeStaffMember, updateStaffRole, refetch: fetchStaff };
+  return {
+    staff,
+    loading,
+    error,
+    inserting,
+    batchInsertStaff,
+    removeStaffMember,
+    updateStaffRole,
+    refetch: fetchStaff,
+  };
 }
 
 export function useRealtimeNotifications(shopId?: string) {
