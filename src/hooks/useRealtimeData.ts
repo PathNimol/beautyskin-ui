@@ -6,6 +6,7 @@ import {
   ordersApi,
   shopsApi,
   notificationsApi,
+  shopStaffApi,
   mapApiInventory,
   mapApiOrder,
   mapApiShop,
@@ -51,7 +52,14 @@ export interface DbOrder {
   subtotal: number;
   shipping: number;
   discount: number;
-  order_status: 'Pending' | 'Confirmed' | 'Packing' | 'Shipping' | 'Delivered' | 'Cancelled' | 'Returned';
+  order_status:
+    | 'Pending'
+    | 'Confirmed'
+    | 'Packing'
+    | 'Shipping'
+    | 'Delivered'
+    | 'Cancelled'
+    | 'Returned';
   payment_method: string;
   pay_status: 'Paid' | 'Pending' | 'Refunded';
   address: string;
@@ -100,23 +108,39 @@ export interface DbStaff {
 export interface DbNotification {
   id: string;
   shop_id: string | null;
-  type: 'new_order' | 'low_stock' | 'expiry_alert' | 'promotion' | 'review' | 'system';
+  type:
+    | 'new_order'
+    | 'low_stock'
+    | 'expiry_alert'
+    | 'promotion'
+    | 'review'
+    | 'system'
+    | 'shop_approval';
   title: string;
   message: string;
   is_read: boolean;
   metadata: Record<string, unknown>;
   created_at: string;
 }
-
-export function useRealtimeInventory(shopIdOverride?: string) {
-  const { shopId: authShopId, isAuthenticated } = useMockAuth();
-  const shopId = shopIdOverride ?? authShopId ?? undefined;
+export function useRealtimeInventory(shopIdOverride?: string, platformWide = false) {
+  const { shopId: authShopId, role, isAuthenticated } = useMockAuth();
+  const shopId =
+    platformWide && role === 'admin'
+      ? undefined
+      : role === 'admin'
+        ? shopIdOverride
+        : (shopIdOverride ?? authShopId ?? undefined);
   const [inventory, setInventory] = useState<DbInventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchInventory = useCallback(async () => {
-    if (!isAuthenticated || !shopId) {
+    if (!isAuthenticated) {
+      setInventory([]);
+      setLoading(false);
+      return;
+    }
+    if (!shopId && !(platformWide && role === 'admin')) {
       setInventory([]);
       setLoading(false);
       return;
@@ -130,7 +154,7 @@ export function useRealtimeInventory(shopIdOverride?: string) {
     } finally {
       setLoading(false);
     }
-  }, [shopId, isAuthenticated]);
+  }, [shopId, isAuthenticated, platformWide, role]);
 
   const restockItem = useCallback(
     async (itemId: string, qty: number) => {
@@ -236,7 +260,15 @@ export function useRealtimeOrders(shopIdOverride?: string) {
     revenue: orders.filter((o) => o.pay_status === 'Paid').reduce((s, o) => s + Number(o.total), 0),
   };
 
-  return { orders, loading, error, stats, updateOrderStatus, bulkUpdateStatus, refetch: fetchOrders };
+  return {
+    orders,
+    loading,
+    error,
+    stats,
+    updateOrderStatus,
+    bulkUpdateStatus,
+    refetch: fetchOrders,
+  };
 }
 
 export function useRealtimeShops() {
@@ -283,17 +315,7 @@ export function useRealtimeStaff(shopId?: string) {
     }
     setLoading(true);
     try {
-      const { apiFetch } = await import('@/lib/api/client');
-      const page = await apiFetch<{ content: Array<{
-        id: string;
-        name: string;
-        email: string;
-        phone?: string;
-        role: string;
-        status: string;
-        shop?: { id: string };
-        createdAt?: string;
-      }> }>(`/shops/${shopId}/users?limit=100`);
+      const page = await shopStaffApi.list(shopId, { limit: 100 });
       setStaff(
         page.content.map((u) => ({
           id: u.id,
@@ -302,11 +324,11 @@ export function useRealtimeStaff(shopId?: string) {
           email: u.email,
           phone: u.phone || '',
           role: (u.role.charAt(0) + u.role.slice(1).toLowerCase()) as DbStaff['role'],
-          avatar: '',
-          avatar_alt: u.name,
+          avatar: u.avatar || '',
+          avatar_alt: u.avatarAlt || u.name,
           status: u.status === 'ACTIVE' ? 'Active' : 'Inactive',
-          created_at: u.createdAt || '',
-          updated_at: u.createdAt || '',
+          created_at: '',
+          updated_at: '',
         }))
       );
     } catch (err: unknown) {
@@ -316,15 +338,70 @@ export function useRealtimeStaff(shopId?: string) {
     }
   }, [shopId]);
 
-  const batchInsertStaff = useCallback(async () => ({ inserted: 0, errors: [] as string[] }), []);
-  const removeStaffMember = useCallback(async () => true, []);
-  const updateStaffRole = useCallback(async () => true, []);
+  const batchInsertStaff = useCallback(
+    async (rows: Array<{ name: string; email: string; phone?: string; role: string }>) => {
+      if (!shopId) return { inserted: 0, errors: ['No shop'] as string[] };
+      const errors: string[] = [];
+      let inserted = 0;
+      for (const row of rows) {
+        try {
+          await shopStaffApi.create(shopId, {
+            name: row.name,
+            email: row.email,
+            phone: row.phone,
+            role: row.role.toUpperCase(),
+          });
+          inserted++;
+        } catch (e) {
+          errors.push(e instanceof Error ? e.message : 'Insert failed');
+        }
+      }
+      await fetchStaff();
+      return { inserted, errors };
+    },
+    [shopId, fetchStaff]
+  );
+  const removeStaffMember = useCallback(
+    async (staffId: string) => {
+      if (!shopId) return false;
+      try {
+        await shopStaffApi.remove(shopId, staffId);
+        await fetchStaff();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [shopId, fetchStaff]
+  );
+  const updateStaffRole = useCallback(
+    async (staffId: string, role: DbStaff['role']) => {
+      if (!shopId) return false;
+      try {
+        await shopStaffApi.update(shopId, staffId, { role: role.toUpperCase() });
+        await fetchStaff();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [shopId, fetchStaff]
+  );
 
   useEffect(() => {
     fetchStaff();
   }, [fetchStaff]);
 
-  return { staff, loading, error, inserting, batchInsertStaff, removeStaffMember, updateStaffRole, refetch: fetchStaff };
+  return {
+    staff,
+    loading,
+    error,
+    inserting,
+    batchInsertStaff,
+    removeStaffMember,
+    updateStaffRole,
+    refetch: fetchStaff,
+  };
 }
 
 export function useRealtimeNotifications(shopId?: string) {
@@ -356,9 +433,14 @@ export function useRealtimeNotifications(shopId?: string) {
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    await Promise.all(notifications.filter((n) => !n.is_read).map((n) => notificationsApi.markRead(n.id)));
+    await notificationsApi.markAllRead();
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-  }, [notifications]);
+  }, []);
+
+  const deleteNotification = useCallback(async (notifId: string) => {
+    await notificationsApi.deleteNotification(notifId);
+    setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+  }, []);
 
   const dismissToast = useCallback((notifId: string) => {
     setToastQueue((prev) => prev.filter((n) => n.id !== notifId));
@@ -372,5 +454,15 @@ export function useRealtimeNotifications(shopId?: string) {
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  return { notifications, loading, unreadCount, toastQueue, markAsRead, markAllAsRead, dismissToast, refetch: fetchNotifications };
+  return {
+    notifications,
+    loading,
+    unreadCount,
+    toastQueue,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    dismissToast,
+    refetch: fetchNotifications,
+  };
 }

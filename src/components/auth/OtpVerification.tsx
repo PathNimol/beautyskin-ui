@@ -2,36 +2,46 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Icon from '@/components/ui/AppIcon';
-import { OTP_DURATION_SEC, verifyOtp, generateOtp, getOtpRemainingSeconds } from '@/lib/mock/authStore';
+
+const DEFAULT_OTP_UI_TTL_SEC = 600;
 
 interface OtpVerificationProps {
   email: string;
-  onVerified: () => void;
-  onResend?: () => void;
+  /** Called with the 6-digit code from the user; errors should throw or surface via ApiError message. */
+  onSubmitCode: (code: string) => Promise<void>;
+  /** Optional resend handler (e.g. POST /auth/otp/send with REGISTER_EMAIL). */
+  onResend?: () => Promise<void>;
   title?: string;
   submitLabel?: string;
+  /** Informational countdown shown in the UI (API TTL may differ slightly). */
+  otpTtlSeconds?: number;
 }
 
 export default function OtpVerification({
   email,
-  onVerified,
+  onSubmitCode,
   onResend,
   title = 'Verify your email',
   submitLabel = 'Verify OTP',
+  otpTtlSeconds = DEFAULT_OTP_UI_TTL_SEC,
 }: OtpVerificationProps) {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [verified, setVerified] = useState(false);
-  const [remaining, setRemaining] = useState(OTP_DURATION_SEC);
+  const [remaining, setRemaining] = useState(otpTtlSeconds);
+  const [tickToken, setTickToken] = useState(0);
   const refs = Array.from({ length: 6 }, () => useRef<HTMLInputElement>(null));
 
   useEffect(() => {
-    generateOtp(email);
-    setRemaining(getOtpRemainingSeconds(email) || OTP_DURATION_SEC);
-    const t = setInterval(() => setRemaining(getOtpRemainingSeconds(email)), 1000);
+    const started = Date.now();
+    setRemaining(otpTtlSeconds);
+    const t = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - started) / 1000);
+      setRemaining(Math.max(0, otpTtlSeconds - elapsed));
+    }, 1000);
     return () => clearInterval(t);
-  }, [email]);
+  }, [email, otpTtlSeconds, tickToken]);
 
   const formatTime = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -51,16 +61,19 @@ export default function OtpVerification({
     if (e.key === 'Backspace' && !otp[i] && i > 0) refs[i - 1].current?.focus();
   };
 
-  const handleResend = () => {
-    generateOtp(email);
-    setRemaining(OTP_DURATION_SEC);
-    setOtp(['', '', '', '', '', '']);
+  const handleResend = async () => {
     setError('');
-    onResend?.();
+    setOtp(['', '', '', '', '', '']);
     refs[0].current?.focus();
+    try {
+      if (onResend) await onResend();
+      setTickToken((x) => x + 1);
+    } catch {
+      setError('Could not resend code. Try again shortly.');
+    }
   };
 
-  const handleVerify = (e?: React.FormEvent) => {
+  const handleVerify = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const code = otp.join('');
     if (code.length < 6) {
@@ -69,22 +82,17 @@ export default function OtpVerification({
     }
     setError('');
     setLoading(true);
-    setTimeout(() => {
+    try {
+      await onSubmitCode(code);
+      setVerified(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Verification failed';
+      setError(msg);
+      setOtp(['', '', '', '', '', '']);
+      refs[0].current?.focus();
+    } finally {
       setLoading(false);
-      const result = verifyOtp(email, code);
-      if (result.expired) {
-        setError('OTP expired. Request a new code.');
-        return;
-      }
-      if (result.valid) {
-        setVerified(true);
-        setTimeout(onVerified, 1200);
-      } else {
-        setError('Invalid OTP. Demo code: 123456');
-        setOtp(['', '', '', '', '', '']);
-        refs[0].current?.focus();
-      }
-    }, 600);
+    }
   };
 
   if (verified) {
@@ -92,7 +100,7 @@ export default function OtpVerification({
   }
 
   return (
-    <form onSubmit={handleVerify}>
+    <form onSubmit={(e) => void handleVerify(e)}>
       <div className="w-14 h-14 bg-primary/20 rounded-2xl flex items-center justify-center mb-6">
         <Icon name="DevicePhoneMobileIcon" size={26} className="text-rose-deep" />
       </div>
@@ -130,7 +138,7 @@ export default function OtpVerification({
             <span className="font-mono font-semibold text-foreground">{formatTime(remaining)}</span>
           </>
         ) : (
-          <span className="text-red-600 font-medium">OTP expired</span>
+          <span className="text-amber-700 font-medium">Code may have expired — request a new one below.</span>
         )}
       </p>
 
@@ -151,14 +159,14 @@ export default function OtpVerification({
 
       <button
         type="button"
-        onClick={handleResend}
+        onClick={() => void handleResend()}
         className="w-full mt-3 text-sm text-accent hover:text-gold-deep font-semibold"
       >
         Resend code
       </button>
 
       <p className="text-center text-xs text-muted-foreground mt-4">
-        Demo: <span className="font-mono font-semibold">123456</span> · Valid {OTP_DURATION_SEC / 60} min
+        Enter the OTP from your email (dev builds may log OTP when SMTP is off).
       </p>
     </form>
   );

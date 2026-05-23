@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useMockAuth } from '@/contexts/MockAuthContext';
-import { createClient } from '@/lib/supabase/client';
-import { MOCK_USERS } from '@/lib/mock/data';
+import { directMessagesApi, customersApi } from '@/lib/api';
+import type { ApiUser } from '@/lib/api/types';
 import { emailService } from '@/lib/emailService';
 
 interface DirectMessage {
@@ -55,8 +54,7 @@ function getConversationId(userId1: string, userId2: string): string {
 
 export default function DirectMessagesClient() {
   const { user, role } = useMockAuth();
-  const supabase = createClient();
-
+  const [availableUsers, setAvailableUsers] = useState<ApiUser[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -67,121 +65,85 @@ export default function DirectMessagesClient() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Get available users to message (role-gated)
-  const availableUsers = MOCK_USERS.filter(u => {
-    if (!u || u.id === user?.id) return false;
-    if (role === 'buyer') return u.role === 'staff' || u.role === 'owner' || u.role === 'admin';
-    if (role === 'staff') return true;
-    if (role === 'owner') return true;
-    if (role === 'admin') return true;
-    return false;
-  });
+  useEffect(() => {
+    customersApi.listCustomers({ limit: 100 }).then((p) => setAvailableUsers(p.content || [])).catch(() => {});
+  }, []);
 
-  const filteredUsers = availableUsers.filter(u =>
-    u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = availableUsers.filter(u => {
+    if (u.id === user?.id) return false;
+    const name = u.fullName || u.name || u.email;
+    return name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   const fetchConversations = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('direct_messages')
-        .select('*')
-        .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
-
-      if (data) {
-        const convMap = new Map<string, Conversation>();
-        (data as DirectMessage[]).forEach(msg => {
-          const otherId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
-          const otherName = msg.sender_id === user.id ? msg.recipient_name : msg.sender_name;
-          const otherRole = msg.sender_id === user.id ? msg.recipient_role : msg.sender_role;
-          const otherAvatar = msg.sender_id === user.id ? '' : msg.sender_avatar;
-          const convId = msg.conversation_id;
-
-          if (!convMap.has(convId)) {
-            convMap.set(convId, {
-              userId: otherId,
-              userName: otherName,
-              userRole: otherRole,
-              userAvatar: otherAvatar,
-              lastMessage: msg.message,
-              lastTime: msg.created_at,
-              unreadCount: (!msg.is_read && msg.recipient_id === user.id) ? 1 : 0,
-            });
-          } else {
-            const existing = convMap.get(convId)!;
-            if (!msg.is_read && msg.recipient_id === user.id) {
-              existing.unreadCount += 1;
-            }
-          }
-        });
-        setConversations(Array.from(convMap.values()));
-      }
+      const threads = await directMessagesApi.listThreads();
+      setConversations(
+        (threads || []).map((t) => ({
+          userId: t.participantId || t.id,
+          userName: t.participantName || 'User',
+          userRole: 'customer',
+          userAvatar: '',
+          lastMessage: t.lastMessage || '',
+          lastTime: '',
+          unreadCount: t.unreadCount || 0,
+        }))
+      );
     } catch { /* ignore */ }
     setLoading(false);
-  }, [supabase, user]);
+  }, [user]);
 
-  const fetchMessages = useCallback(async (conversationId: string) => {
+  const fetchMessages = useCallback(async (threadId: string) => {
     try {
-      const { data } = await supabase
-        .from('direct_messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
-      if (data) setMessages(data as DirectMessage[]);
-
-      // Mark as read
-      if (user) {
-        await supabase
-          .from('direct_messages')
-          .update({ is_read: true })
-          .eq('conversation_id', conversationId)
-          .eq('recipient_id', user.id);
-      }
+      const page = await directMessagesApi.listMessages(threadId);
+      setMessages(
+        (page.content || []).map((m) => ({
+          id: m.id,
+          conversation_id: threadId,
+          sender_id: m.senderId || '',
+          sender_name: 'User',
+          sender_role: role || 'buyer',
+          sender_avatar: '',
+          recipient_id: activeConversation?.userId || '',
+          recipient_name: activeConversation?.userName || '',
+          recipient_role: activeConversation?.userRole || '',
+          message: m.content,
+          message_type: 'text',
+          is_read: Boolean(m.read),
+          created_at: m.createdAt || new Date().toISOString(),
+        }))
+      );
+      await directMessagesApi.markRead(threadId);
     } catch { /* ignore */ }
-  }, [supabase, user]);
+  }, [role, activeConversation]);
 
   useEffect(() => {
     fetchConversations();
+    const interval = setInterval(fetchConversations, 15000);
+    return () => clearInterval(interval);
   }, [fetchConversations]);
 
   useEffect(() => {
     if (!activeConversation || !user) return;
-    const convId = getConversationId(user.id, activeConversation.userId);
-    fetchMessages(convId);
-
-    const channel = supabase
-      .channel(`dm_${convId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'direct_messages',
-        filter: `conversation_id=eq.${convId}`,
-      }, (payload) => {
-        setMessages(prev => {
-          const exists = prev.find(m => m.id === payload.new.id);
-          if (exists) return prev;
-          return [...prev, payload.new as DirectMessage];
-        });
-        fetchConversations();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [activeConversation, user, supabase, fetchMessages, fetchConversations]);
+    const threadId = activeConversation.userId;
+    fetchMessages(threadId);
+    const interval = setInterval(() => fetchMessages(threadId), 5000);
+    return () => clearInterval(interval);
+  }, [activeConversation, user, fetchMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const startConversation = (targetUser: typeof MOCK_USERS[0]) => {
+  const startConversation = (targetUser: ApiUser) => {
+    const name = targetUser.fullName || targetUser.name || targetUser.email;
     setActiveConversation({
       userId: targetUser.id,
-      userName: targetUser.name,
-      userRole: targetUser.role,
+      userName: name,
+      userRole: targetUser.role || 'customer',
       userAvatar: targetUser.avatar || '',
       lastMessage: '',
       lastTime: '',
@@ -202,20 +164,11 @@ export default function DirectMessagesClient() {
     setInput('');
 
     try {
-      const convId = getConversationId(user.id, activeConversation.userId);
-      await supabase.from('direct_messages').insert({
-        conversation_id: convId,
-        sender_id: user.id,
-        sender_name: user.name,
-        sender_role: role || 'buyer',
-        sender_avatar: user.avatar || '',
-        recipient_id: activeConversation.userId,
-        recipient_name: activeConversation.userName,
-        recipient_role: activeConversation.userRole,
-        message: text,
-        message_type: 'text',
-        is_read: false,
+      await directMessagesApi.send({
+        recipientId: activeConversation.userId,
+        content: text,
       });
+      await fetchMessages(activeConversation.userId);
 
       // Send email notification
       const recipientUser = MOCK_USERS.find(u => u.id === activeConversation.userId);
@@ -252,7 +205,6 @@ export default function DirectMessagesClient() {
   };
 
   return (
-    <DashboardLayout title="Direct Messages" subtitle="Private one-to-one messaging">
       <div className="flex gap-4 h-[calc(100vh-200px)] min-h-[500px]">
         {/* Left Panel: Conversations + User Search */}
         <div className="w-72 shrink-0 bg-card border border-border rounded-2xl flex flex-col overflow-hidden">
@@ -476,6 +428,5 @@ export default function DirectMessagesClient() {
           )}
         </div>
       </div>
-    </DashboardLayout>
   );
 }

@@ -6,13 +6,14 @@ import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import ConfirmModal from '@/components/ConfirmModel';
 import { useMockAuth } from '@/contexts/MockAuthContext';
+import { useAuthReady } from '@/hooks/useAuthReady';
+import DashboardContentSkeleton from '@/components/ui/DashboardContentSkeleton';
 import { useRealtimeShops } from '@/hooks/useRealtimeData';
 import {
   computeProductStatus,
   useShopProductManagement,
   type DbProductRow,
 } from '@/hooks/useShopProductManagement';
-import { createClient } from '@/lib/supabase/client';
 
 type VisibilityFilter = 'all' | 'listed' | 'attention';
 
@@ -39,19 +40,16 @@ function splitList(s: string): string[] {
     .filter(Boolean);
 }
 
-async function tryUploadProductImage(file: File, shopId: string): Promise<{ url: string | null; error?: string }> {
-  const supabase = createClient();
-  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const path = `${shopId}/${Date.now()}-${safe}`;
-  const { error } = await supabase.storage.from('product-images').upload(path, file, {
-    cacheControl: '3600',
-    upsert: false,
+async function tryUploadProductImage(
+  file: File,
+  _shopId: string
+): Promise<{ url: string | null; error?: string }> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ url: reader.result as string });
+    reader.onerror = () => resolve({ url: null, error: 'Failed to read image' });
+    reader.readAsDataURL(file);
   });
-  if (error) {
-    return { url: null, error: error.message };
-  }
-  const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-  return { url: data.publicUrl };
 }
 
 type FormState = {
@@ -119,6 +117,7 @@ function productToForm(p: DbProductRow | null): FormState {
 
 export default function AdminProductManagementClient({ shopId }: { shopId: string }) {
   const { role } = useMockAuth();
+  const authReady = useAuthReady();
   const { shops } = useRealtimeShops();
   const shop = shops.find((s) => s.id === shopId);
 
@@ -149,7 +148,11 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
   const [search, setSearch] = useState('');
   const [visibility, setVisibility] = useState<VisibilityFilter>('all');
   const [toast, setToast] = useState<string | null>(null);
-  const [danger, setDanger] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [danger, setDanger] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const [catalogTab, setCatalogTab] = useState<'categories' | 'brands'>('categories');
   const [showCatalog, setShowCatalog] = useState(false);
@@ -313,7 +316,11 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
     for (const file of Array.from(files)) {
       const { url, error: upErr } = await tryUploadProductImage(file, shopId);
       if (upErr || !url) {
-        showToast(upErr || 'Upload failed — create a public "product-images" bucket in Supabase Storage, or paste image URLs in the product form.', true);
+        showToast(
+          upErr ||
+            'Upload failed — create a public "product-images" bucket in Supabase Storage, or paste image URLs in the product form.',
+          true
+        );
         setGalleryUploading(false);
         e.target.value = '';
         return;
@@ -332,11 +339,24 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
     }
   };
 
+  if (!authReady) {
+    return (
+      <div className="p-8">
+        <DashboardContentSkeleton />
+      </div>
+    );
+  }
+
   if (role !== 'admin') {
     return (
       <div className="p-8">
-        <p className="text-sm text-muted-foreground">Product administration is limited to the admin role.</p>
-        <Link href="/admin/shops" className="text-sm font-semibold text-rose-deep mt-2 inline-block">
+        <p className="text-sm text-muted-foreground">
+          Product administration is limited to the admin role.
+        </p>
+        <Link
+          href="/admin/shops"
+          className="text-sm font-semibold text-rose-deep mt-2 inline-block"
+        >
           Back to shops
         </Link>
       </div>
@@ -348,16 +368,21 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 pl-10 md:pl-0">
         <div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-            <Link href="/admin/products" className="hover:text-foreground">
+            <Link href="/admin/shops" className="hover:text-foreground">
               Shops
             </Link>
             <span>/</span>
-            <span className="text-foreground font-medium truncate max-w-[200px]">{shop?.name || 'Shop'}</span>
+            <span className="text-foreground font-medium truncate max-w-[200px]">
+              {shop?.name || 'Shop'}
+            </span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-tight">Product management</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-tight">
+            Product management
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Catalog is scoped to this shop. Deletes are soft (<code className="text-xs">is_deleted</code>); you see
-            removed and active items and can restore after staff expiry or revoke actions.
+            Catalog is scoped to this shop. Deletes are soft (
+            <code className="text-xs">is_deleted</code>); you see removed and active items and can
+            restore after staff expiry or revoke actions.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -397,7 +422,11 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
 
       <div className="flex flex-col lg:flex-row gap-3 mb-6">
         <div className="relative flex-1">
-          <Icon name="MagnifyingGlassIcon" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Icon
+            name="MagnifyingGlassIcon"
+            size={16}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <input
             type="search"
             placeholder="Search name, brand, SKU…"
@@ -422,13 +451,27 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
           <table className="w-full min-w-[900px]">
             <thead>
               <tr className="border-b border-border bg-secondary/30">
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Product</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden md:table-cell">SKU</th>
-                <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Price</th>
-                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stock</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden lg:table-cell">Expiry</th>
-                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Status</th>
-                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Actions</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Product
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden md:table-cell">
+                  SKU
+                </th>
+                <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Price
+                </th>
+                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Stock
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden lg:table-cell">
+                  Expiry
+                </th>
+                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Status
+                </th>
+                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -451,7 +494,13 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl overflow-hidden border border-border shrink-0 bg-secondary">
                           {p.image ? (
-                            <AppImage src={p.image} alt={p.image_alt} width={40} height={40} className="object-cover w-full h-full" />
+                            <AppImage
+                              src={p.image}
+                              alt={p.image_alt}
+                              width={40}
+                              height={40}
+                              className="object-cover w-full h-full"
+                            />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
                               <Icon name="PhotoIcon" size={18} className="text-muted-foreground" />
@@ -459,7 +508,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-foreground leading-snug max-w-[220px] truncate">{p.name}</p>
+                          <p className="text-sm font-semibold text-foreground leading-snug max-w-[220px] truncate">
+                            {p.name}
+                          </p>
                           <p className="text-[10px] text-muted-foreground">{p.brand}</p>
                           <div className="flex flex-wrap gap-1 mt-1">
                             {p.is_deleted && (
@@ -476,10 +527,16 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell text-xs font-mono text-muted-foreground">{p.sku}</td>
-                    <td className="px-4 py-3 text-right text-sm font-bold">${Number(p.price).toFixed(2)}</td>
+                    <td className="px-4 py-3 hidden md:table-cell text-xs font-mono text-muted-foreground">
+                      {p.sku}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-bold">
+                      ${Number(p.price).toFixed(2)}
+                    </td>
                     <td className="px-4 py-3 text-center text-sm font-bold">{p.stock}</td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">{p.expiry_date || '—'}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
+                      {p.expiry_date || '—'}
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <span
                         className={`inline-flex items-center px-2 py-1 rounded-lg text-[10px] font-bold border ${STATUS_STYLES[p.product_status] || STATUS_STYLES.active}`}
@@ -536,7 +593,8 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                           onClick={() =>
                             setDanger({
                               title: 'Soft-delete product?',
-                              message: 'The row stays in the database with is_deleted = true. Admin can restore it later.',
+                              message:
+                                'The row stays in the database with is_deleted = true. Admin can restore it later.',
                               onConfirm: async () => {
                                 const r = await softDeleteProduct(p.id);
                                 setDanger(null);
@@ -551,7 +609,7 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                         </button>
                         <button
                           type="button"
-                          title="Simulate staff: revoke"
+                          title="Revoke"
                           onClick={async () => {
                             const r = await setRevoked(p.id, !p.is_revoked);
                             if (!r.ok) showToast(r.message, true);
@@ -563,7 +621,7 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                         </button>
                         <button
                           type="button"
-                          title="Simulate staff: expire"
+                          title="Expire"
                           onClick={async () => {
                             const r = await markExpired(p.id);
                             if (!r.ok) showToast(r.message, true);
@@ -608,14 +666,17 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                     <td className="py-2 text-xs font-medium">{pname}</td>
                     <td className="py-2 text-xs font-bold">+{ev.quantity_received}</td>
                     <td className="py-2 text-xs">{ev.supplier_name || '—'}</td>
-                    <td className="py-2 text-xs text-muted-foreground max-w-[200px] truncate">{ev.note || '—'}</td>
+                    <td className="py-2 text-xs text-muted-foreground max-w-[200px] truncate">
+                      {ev.note || '—'}
+                    </td>
                   </tr>
                 );
               })}
               {stockEvents.length === 0 && (
                 <tr>
                   <td colSpan={5} className="py-6 text-xs text-muted-foreground">
-                    No purchase events yet. Use the truck icon on a product to record stock from a supplier.
+                    No purchase events yet. Use the truck icon on a product to record stock from a
+                    supplier.
                   </td>
                 </tr>
               )}
@@ -627,18 +688,29 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
       {/* Add / Edit modal */}
       {editing && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => !saving && setEditing(null)} />
+          <div
+            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+            onClick={() => !saving && setEditing(null)}
+          />
           <div className="relative bg-card border border-border rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10">
-              <h2 className="font-bold text-foreground">{editing === 'new' ? 'Add product' : 'Edit product'}</h2>
-              <button type="button" onClick={() => !saving && setEditing(null)} className="p-2 rounded-lg hover:bg-secondary">
+              <h2 className="font-bold text-foreground">
+                {editing === 'new' ? 'Add product' : 'Edit product'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => !saving && setEditing(null)}
+                className="p-2 rounded-lg hover:bg-secondary"
+              >
                 <Icon name="XMarkIcon" size={18} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Name *</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Name *
+                  </label>
                   <input
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
                     value={form.name}
@@ -646,7 +718,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Brand</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Brand
+                  </label>
                   <input
                     list="brand-options"
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
@@ -660,7 +734,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   </datalist>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Category</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Category
+                  </label>
                   <input
                     list="cat-options"
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
@@ -674,7 +750,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   </datalist>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Price</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Price
+                  </label>
                   <input
                     type="number"
                     step="0.01"
@@ -684,7 +762,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Original price</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Original price
+                  </label>
                   <input
                     type="number"
                     step="0.01"
@@ -694,18 +774,26 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Opening stock</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Opening stock
+                  </label>
                   <input
                     type="number"
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
                     value={form.stock}
                     onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
                     disabled={editing !== 'new'}
-                    title={editing !== 'new' ? 'Use “Purchase stock” on the grid to add inventory from suppliers' : undefined}
+                    title={
+                      editing !== 'new'
+                        ? 'Use “Purchase stock” on the grid to add inventory from suppliers'
+                        : undefined
+                    }
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">SKU</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    SKU
+                  </label>
                   <input
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
                     value={form.sku}
@@ -713,16 +801,24 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Expiry date</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Expiry date
+                  </label>
                   <input
                     type="date"
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
-                    value={form.expiry_date.length >= 10 ? form.expiry_date.slice(0, 10) : form.expiry_date}
+                    value={
+                      form.expiry_date.length >= 10
+                        ? form.expiry_date.slice(0, 10)
+                        : form.expiry_date
+                    }
                     onChange={(e) => setForm((f) => ({ ...f, expiry_date: e.target.value }))}
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Primary image URL</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Primary image URL
+                  </label>
                   <div className="flex gap-2">
                     <input
                       className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-sm"
@@ -749,7 +845,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   </div>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Image alt</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Image alt
+                  </label>
                   <input
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
                     value={form.image_alt}
@@ -757,7 +855,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Description</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Description
+                  </label>
                   <textarea
                     rows={3}
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
@@ -766,7 +866,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Ingredients (comma)</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Ingredients (comma)
+                  </label>
                   <input
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
                     value={form.ingredients}
@@ -774,7 +876,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Skin types (comma)</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Skin types (comma)
+                  </label>
                   <input
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
                     value={form.skin_type}
@@ -782,7 +886,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">How to use</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    How to use
+                  </label>
                   <textarea
                     rows={2}
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
@@ -791,7 +897,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Tags (comma)</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Tags (comma)
+                  </label>
                   <input
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
                     value={form.tags}
@@ -799,7 +907,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Weight</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Weight
+                  </label>
                   <input
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
                     value={form.weight}
@@ -807,7 +917,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Origin</label>
+                  <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                    Origin
+                  </label>
                   <input
                     className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
                     value={form.origin}
@@ -841,13 +953,18 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
       {/* Stock purchase */}
       {stockModal && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => setStockModal(null)} />
+          <div
+            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+            onClick={() => setStockModal(null)}
+          />
           <div className="relative bg-card border border-border rounded-2xl shadow-xl w-full max-w-md p-6">
             <h3 className="font-bold text-foreground mb-1">Purchase stock from supplier</h3>
             <p className="text-xs text-muted-foreground mb-4">{stockModal.name}</p>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Quantity received</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                  Quantity received
+                </label>
                 <input
                   type="number"
                   min={1}
@@ -857,7 +974,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Supplier name</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                  Supplier name
+                </label>
                 <input
                   className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
                   value={supplierName}
@@ -865,7 +984,9 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">Note</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase block mb-1">
+                  Note
+                </label>
                 <textarea
                   rows={2}
                   className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm"
@@ -875,10 +996,18 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
               </div>
             </div>
             <div className="flex gap-2 mt-5">
-              <button type="button" onClick={() => setStockModal(null)} className="flex-1 py-2.5 bg-secondary rounded-xl text-sm font-semibold">
+              <button
+                type="button"
+                onClick={() => setStockModal(null)}
+                className="flex-1 py-2.5 bg-secondary rounded-xl text-sm font-semibold"
+              >
                 Cancel
               </button>
-              <button type="button" onClick={handleStockSave} className="flex-1 py-2.5 bg-primary rounded-xl text-sm font-bold">
+              <button
+                type="button"
+                onClick={handleStockSave}
+                className="flex-1 py-2.5 bg-primary rounded-xl text-sm font-bold"
+              >
                 Apply
               </button>
             </div>
@@ -889,18 +1018,30 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
       {/* Gallery */}
       {galleryProduct && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => !galleryUploading && setGalleryProduct(null)} />
+          <div
+            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+            onClick={() => !galleryUploading && setGalleryProduct(null)}
+          />
           <div className="relative bg-card border border-border rounded-2xl shadow-xl w-full max-w-lg p-6">
             <h3 className="font-bold text-foreground mb-1">Product images</h3>
             <p className="text-xs text-muted-foreground mb-4">{galleryProduct.name}</p>
             <p className="text-xs text-muted-foreground mb-3">
-              Primary image is edited in the product form. Here you add extra gallery URLs (stored in{' '}
-              <code className="text-[10px]">gallery</code>).
+              Primary image is edited in the product form. Here you add extra gallery URLs (stored
+              in <code className="text-[10px]">gallery</code>).
             </p>
             <div className="flex flex-wrap gap-2 mb-4">
               {(galleryProduct.gallery || []).map((url) => (
-                <div key={url} className="w-16 h-16 rounded-lg overflow-hidden border border-border">
-                  <AppImage src={url} alt="" width={64} height={64} className="object-cover w-full h-full" />
+                <div
+                  key={url}
+                  className="w-16 h-16 rounded-lg overflow-hidden border border-border"
+                >
+                  <AppImage
+                    src={url}
+                    alt=""
+                    width={64}
+                    height={64}
+                    className="object-cover w-full h-full"
+                  />
                 </div>
               ))}
               {(!galleryProduct.gallery || galleryProduct.gallery.length === 0) && (
@@ -932,11 +1073,18 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
       {/* Categories / brands */}
       {showCatalog && (
         <div className="fixed inset-0 z-[220] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => setShowCatalog(false)} />
+          <div
+            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+            onClick={() => setShowCatalog(false)}
+          />
           <div className="relative bg-card border border-border rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-foreground">Shop catalog</h3>
-              <button type="button" onClick={() => setShowCatalog(false)} className="p-2 rounded-lg hover:bg-secondary">
+              <button
+                type="button"
+                onClick={() => setShowCatalog(false)}
+                className="p-2 rounded-lg hover:bg-secondary"
+              >
                 <Icon name="XMarkIcon" size={18} />
               </button>
             </div>
@@ -961,21 +1109,29 @@ export default function AdminProductManagementClient({ shopId }: { shopId: strin
                 value={catalogName}
                 onChange={(e) => setCatalogName(e.target.value)}
               />
-              <button type="button" onClick={handleCatalogAdd} className="px-4 py-2 rounded-xl bg-primary text-sm font-bold">
+              <button
+                type="button"
+                onClick={handleCatalogAdd}
+                className="px-4 py-2 rounded-xl bg-primary text-sm font-bold"
+              >
                 Add
               </button>
             </div>
             <ul className="divide-y divide-border text-sm">
               {(catalogTab === 'categories' ? categoriesAll : brandsAll).map((row) => (
                 <li key={row.id} className="py-2 flex items-center justify-between gap-2">
-                  <span className={row.is_deleted ? 'line-through text-muted-foreground' : ''}>{row.name}</span>
+                  <span className={row.is_deleted ? 'line-through text-muted-foreground' : ''}>
+                    {row.name}
+                  </span>
                   {!row.is_deleted && (
                     <button
                       type="button"
                       className="text-[10px] font-bold text-red-600"
                       onClick={async () => {
                         const ok =
-                          catalogTab === 'categories' ? await softDeleteCategory(row.id) : await softDeleteBrand(row.id);
+                          catalogTab === 'categories'
+                            ? await softDeleteCategory(row.id)
+                            : await softDeleteBrand(row.id);
                         if (ok) showToast('Removed from picker (soft-deleted)');
                         else showToast('Could not remove', true);
                       }}

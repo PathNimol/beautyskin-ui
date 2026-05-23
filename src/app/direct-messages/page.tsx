@@ -1,3 +1,5 @@
+'use client';
+
 import DirectMessagesClient from './DirectMessagesClient';
 
 export default function DirectMessagesPage() {

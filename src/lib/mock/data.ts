@@ -2,9 +2,9 @@
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type UserRole = 'admin' | 'owner' | 'staff' | 'customer';
+export type UserRole = 'admin' | 'owner' | 'staff' | 'customer' | 'buyer';
 
-/** @deprecated use `customer` */
+/** @deprecated Prefer `customer`; kept for legacy comparisons */
 export type LegacyUserRole = 'buyer';
 
 export interface CustomerShipping {
@@ -71,6 +71,7 @@ export interface Product {
   expiryDate: string;
   sku: string;
   shopId: string;
+  shopName?: string;
   status: 'active' | 'low_stock' | 'out_of_stock' | 'expiring_soon' | 'expired';
   tags: string[];
   weight: string;

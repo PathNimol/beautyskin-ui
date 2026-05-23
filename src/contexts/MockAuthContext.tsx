@@ -1,19 +1,26 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { usePathname } from 'next/navigation';
+import { isPublicRoute } from '@/lib/auth/publicRoutes';
 import { authApi, mapApiUserToMock, saveAuthTokens, clearAuthTokens, ApiError } from '@/lib/api';
+import type { TokenPayload } from '@/lib/api/services/auth';
+import type { RegisterPendingResponse } from '@/lib/api/types';
 import { SESSION_KEY, TOKEN_KEY } from '@/lib/api/config';
 import type { MockUser, UserRole, CustomerShipping } from '@/lib/mock/data';
 
 type OAuthProvider = 'google' | 'facebook' | 'tiktok';
 
-interface RegisterInput {
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api';
+
+/** Spring API only registers CUSTOMER accounts — UI restricts self-signup accordingly. */
+interface RegisterPendingInput {
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
   password: string;
-  uiRole: string;
+  confirmPassword: string;
 }
 
 interface MockAuthContextType {
@@ -21,12 +28,20 @@ interface MockAuthContextType {
   loading: boolean;
   role: UserRole | null;
   shopId: string | null;
-  signIn: (email: string, password: string) => Promise<void>;
-  signInWithOAuth: (provider: OAuthProvider) => Promise<void>;
-  register: (input: RegisterInput) => Promise<MockUser>;
-  signOut: () => void;
+  signIn: (email: string, password: string) => Promise<MockUser>;
+  signInWithOAuth: (provider: OAuthProvider) => void;
+  registerPending: (input: RegisterPendingInput) => Promise<RegisterPendingResponse>;
+  confirmRegistration: (email: string, code: string) => Promise<MockUser>;
+  signOut: () => Promise<void>;
   refreshSession: () => boolean;
-  updateProfile: (patch: Partial<MockUser> & { shipping?: Partial<CustomerShipping> }) => void;
+  updateProfile: (patch: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    avatar?: string;
+    avatarAlt?: string;
+    shipping?: Partial<CustomerShipping>;
+  }) => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -58,21 +73,48 @@ function deleteCookie(name: string) {
   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
 }
 
-function persistSession(user: MockUser, tokens: { accessToken: string; refreshToken: string; expiresIn: number }) {
+function persistSession(
+  user: MockUser,
+  tokens: { accessToken: string; refreshToken: string; expiresIn: number }
+) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   saveAuthTokens(tokens);
   setCookie('bs_session', user.id);
 }
 
-export const MockAuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<MockUser | null>(null);
-  const [loading, setLoading] = useState(true);
+function readCachedUser(): MockUser | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return normalizeUser(JSON.parse(raw) as MockUser);
+  } catch {
+    return null;
+  }
+}
 
-  const loadSession = useCallback(async () => {
+function initialAuthLoading(pathname: string): boolean {
+  if (typeof window === 'undefined') return true;
+  const hasTokens = !!localStorage.getItem(TOKEN_KEY);
+  if (!hasTokens) return false;
+  // Keep loading true until the first session sync — avoids SSR/client role mismatch
+  if (!isPublicRoute(pathname) && hasTokens) return true;
+  return false;
+}
+
+export const MockAuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const pathname = usePathname();
+  const [user, setUser] = useState<MockUser | null>(() => readCachedUser());
+  const [loading, setLoading] = useState(() => initialAuthLoading(pathname));
+  const protectedSessionSynced = useRef(false);
+
+  const loadSession = useCallback(async (options?: { blockUi?: boolean }) => {
+    const blockUi = options?.blockUi ?? true;
+    if (blockUi) setLoading(true);
     try {
       const tokensRaw = localStorage.getItem(TOKEN_KEY);
       if (!tokensRaw) {
-        setLoading(false);
+        setUser(null);
         return;
       }
       const apiUser = await authApi.getMe();
@@ -86,84 +128,148 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
       deleteCookie('bs_session');
       setUser(null);
     } finally {
-      setLoading(false);
+      if (blockUi) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadSession();
-  }, [loadSession]);
+    const isPublic = isPublicRoute(pathname);
+    const hasTokens = typeof window !== 'undefined' && !!localStorage.getItem(TOKEN_KEY);
 
-  const establishSession = (apiUser: ReturnType<typeof mapApiUserToMock>, tokens: {
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: number;
-  }) => {
-    const normalized = normalizeUser(apiUser);
+    if (isPublic && !hasTokens) {
+      setUser(null);
+      setLoading(false);
+      protectedSessionSynced.current = false;
+      return;
+    }
+
+    if (isPublic && hasTokens) {
+      setLoading(false);
+      void loadSession({ blockUi: false });
+      return;
+    }
+
+    // Protected routes: sync session once — do not refetch on every sidebar navigation
+    const cached = readCachedUser();
+    if (cached) {
+      setUser((prev) => prev ?? cached);
+      setLoading(false);
+      if (!protectedSessionSynced.current) {
+        protectedSessionSynced.current = true;
+        void loadSession({ blockUi: false });
+      }
+      return;
+    }
+
+    void loadSession({ blockUi: true }).then(() => {
+      protectedSessionSynced.current = true;
+    });
+  }, [pathname, loadSession]);
+
+  const establishFromTokenPayload = useCallback((res: TokenPayload): MockUser => {
+    const normalized = normalizeUser(mapApiUserToMock(res.user));
+    protectedSessionSynced.current = true;
     setUser(normalized);
-    persistSession(normalized, tokens);
-  };
-
-  const signIn = async (email: string, password: string) => {
-    const res = await authApi.login({ email, password });
-    establishSession(mapApiUserToMock(res.user), {
+    persistSession(normalized, {
       accessToken: res.accessToken,
       refreshToken: res.refreshToken,
       expiresIn: res.expiresIn,
     });
-  };
+    return normalized;
+  }, []);
 
-  const signInWithOAuth = async (provider: OAuthProvider) => {
-    const res = await authApi.oauth(provider);
-    establishSession(mapApiUserToMock(res.user), {
-      accessToken: res.accessToken,
-      refreshToken: res.refreshToken,
-      expiresIn: res.expiresIn,
-    });
-  };
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      const res = await authApi.login({ email, password });
+      return establishFromTokenPayload(res);
+    },
+    [establishFromTokenPayload]
+  );
 
-  const register = async (input: RegisterInput): Promise<MockUser> => {
-    const res = await authApi.register({
+  const signInWithOAuth = useCallback((provider: OAuthProvider) => {
+    // OAuth2 requires a full browser redirect — cannot use fetch (CORS blocks the redirect)
+    // Spring Security handles the flow: /oauth2/authorize → Google → /oauth2/callback → frontend
+    const redirectAfter = encodeURIComponent(window.location.pathname);
+    window.location.href = `${API_BASE.replace('/api', '')}/oauth2/authorization/${provider}?redirect=${redirectAfter}`;
+  }, []);
+
+  const registerPending = useCallback(async (input: RegisterPendingInput) => {
+    return authApi.register({
       firstName: input.firstName,
       lastName: input.lastName,
       email: input.email,
       phone: input.phone,
       password: input.password,
-      role: input.uiRole.toLowerCase() === 'customer' ? 'customer' : input.uiRole.toLowerCase(),
+      confirmPassword: input.confirmPassword,
     });
-    return mapApiUserToMock(res.user);
-  };
+  }, []);
 
-  const signOut = () => {
+  const confirmRegistration = useCallback(
+    async (email: string, code: string) => {
+      const res = await authApi.confirmRegistration({ email, code });
+      return establishFromTokenPayload(res);
+    },
+    [establishFromTokenPayload]
+  );
+
+  const signOut = useCallback(async () => {
+    protectedSessionSynced.current = false;
+    try {
+      const tokensRaw = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+      if (tokensRaw) {
+        const parsed = JSON.parse(tokensRaw) as { refreshToken?: string };
+        if (parsed.refreshToken) {
+          await authApi.logout(parsed.refreshToken);
+        }
+      }
+    } catch {
+      /* ignore network / revoke failures */
+    }
     setUser(null);
     localStorage.removeItem(SESSION_KEY);
     clearAuthTokens();
     deleteCookie('bs_session');
-  };
+  }, []);
 
   const refreshSession = (): boolean => {
-    loadSession();
+    void loadSession();
     return true;
   };
 
-  const updateProfile = async (patch: Partial<MockUser> & { shipping?: Partial<CustomerShipping> }) => {
-    if (!user) return;
-    try {
+  const updateProfile = useCallback(
+    async (patch: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      avatar?: string;
+      avatarAlt?: string;
+      shipping?: Partial<CustomerShipping>;
+    }) => {
+      if (!user) return;
+      // Build body matching the API payload exactly
       const body: Record<string, unknown> = {};
-      if (patch.name) body.name = patch.name;
+      if (patch.firstName) body.firstName = patch.firstName;
+      if (patch.lastName) body.lastName = patch.lastName;
       if (patch.phone) body.phone = patch.phone;
       if (patch.avatar) body.avatar = patch.avatar;
-      if (patch.shipping) body.shipping = { ...(user.shipping ?? emptyShipping(user)), ...patch.shipping };
+      if (patch.avatarAlt) body.avatarAlt = patch.avatarAlt;
+      if (patch.shipping)
+        body.shipping = { ...(user.shipping ?? emptyShipping(user)), ...patch.shipping };
       const updated = await authApi.updateProfile(body);
       const normalized = normalizeUser(mapApiUserToMock(updated));
       setUser(normalized);
       const tokensRaw = localStorage.getItem(TOKEN_KEY);
-      const tokens = tokensRaw ? JSON.parse(tokensRaw) : null;
-      if (tokens) persistSession(normalized, tokens);
-    } catch (e) {
-      if (e instanceof ApiError) throw e;
-    }
-  };
+      const tokens = tokensRaw
+        ? (JSON.parse(tokensRaw) as {
+            accessToken: string;
+            refreshToken: string;
+            expiresIn: number;
+          })
+        : null;
+      if (tokens?.accessToken) persistSession(normalized, tokens);
+    },
+    [user]
+  );
 
   return (
     <MockAuthContext.Provider
@@ -174,12 +280,12 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
         shopId: user?.shopId ?? null,
         signIn,
         signInWithOAuth,
-        register,
+        registerPending,
+        confirmRegistration,
         signOut,
         refreshSession,
-        updateProfile: (patch) => {
-          void updateProfile(patch);
-        },
+        // Expose as async so callers can await and catch errors
+        updateProfile,
         isAuthenticated: !!user,
       }}
     >

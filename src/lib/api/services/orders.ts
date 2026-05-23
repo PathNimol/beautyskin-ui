@@ -1,5 +1,5 @@
 import { apiFetch } from '../client';
-import type { ApiOrder, PageData } from '../types';
+import type { ApiOrder, PageData, PlaceOrderRequest, PlaceOrderResult } from '../types';
 
 export function listOrders(params?: { shopId?: string; status?: string; search?: string; page?: number; limit?: number }) {
   const q = new URLSearchParams();
@@ -25,9 +25,13 @@ export function bulkUpdateStatus(ids: string[], status: string) {
   });
 }
 
-export function placeOrder(body: Record<string, unknown>) {
-  return apiFetch<ApiOrder>('/orders', {
+export function placeOrder(body: PlaceOrderRequest) {
+  return apiFetch<PlaceOrderResult>('/orders', {
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+export function getOrder(id: string) {
+  return apiFetch<ApiOrder>(`/orders/${id}`);
 }

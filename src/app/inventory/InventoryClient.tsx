@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useRealtimeInventory } from '@/hooks/useRealtimeData';
 
@@ -14,8 +13,16 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
   expired: { bg: 'bg-red-100', text: 'text-red-800', label: 'Expired' },
 };
 
-export default function InventoryClient() {
-  const { inventory, loading, error, stats, lowStockAlerts, restockItem } = useRealtimeInventory();
+interface InventoryClientProps {
+  /** When true and user is admin, loads platform-wide inventory (no shopId). */
+  platformWide?: boolean;
+}
+
+export default function InventoryClient({ platformWide = false }: InventoryClientProps) {
+  const { inventory, loading, error, stats, lowStockAlerts, restockItem } = useRealtimeInventory(
+    undefined,
+    platformWide
+  );
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -48,34 +55,31 @@ export default function InventoryClient() {
 
   if (loading) {
     return (
-      <DashboardLayout title="Inventory" subtitle="Track and manage product stock levels">
-        <div className="flex items-center justify-center py-24">
+      <><div className="flex items-center justify-center py-24">
           <div className="flex flex-col items-center gap-4">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             <p className="text-sm text-muted-foreground font-medium">Loading live inventory...</p>
           </div>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (error) {
     return (
-      <DashboardLayout title="Inventory" subtitle="Track and manage product stock levels">
-        <div className="flex items-center justify-center py-24">
+      <><div className="flex items-center justify-center py-24">
           <div className="bg-red-50 border border-red-200 rounded-2xl p-6 max-w-md text-center">
             <Icon name="ExclamationTriangleIcon" size={32} className="text-red-500 mx-auto mb-3" />
             <p className="text-sm font-bold text-red-700 mb-1">Failed to load inventory</p>
             <p className="text-xs text-red-600">{error}</p>
           </div>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout title="Inventory" subtitle="Real-time stock levels across all shops">
-      {/* Live indicator */}
+    <>{/* Live indicator */}
       <div className="flex items-center gap-2 mb-5">
         <span className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 border border-green-200 rounded-full text-[10px] font-bold text-green-700">
           <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -262,6 +266,6 @@ export default function InventoryClient() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

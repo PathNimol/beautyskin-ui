@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
-import { createClient } from '@/lib/supabase/client';
-import { MOCK_PRODUCTS } from '@/lib/mock/data';
+import { posApi, productsApi } from '@/lib/api';
+import type { ApiPosReceipt, ApiProduct } from '@/lib/api/types';
 
 interface CartItem {
   id: string;
@@ -39,9 +38,9 @@ const DAILY_CANCEL_LIMIT = 3;
 
 export default function POSClient() {
   const { user, role, shopId } = useMockAuth();
-  const supabase = createClient();
 
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [products, setProducts] = useState<ApiProduct[]>([]);
   const [search, setSearch] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -57,8 +56,7 @@ export default function POSClient() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const products = MOCK_PRODUCTS.filter(p => p.stock > 0);
-  const filtered = products.filter(p =>
+  const filtered = products.filter(p => p.stock > 0).filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.sku.toLowerCase().includes(search.toLowerCase())
   );
@@ -67,45 +65,52 @@ export default function POSClient() {
   const taxAmount = (subtotal - discount) * TAX_RATE;
   const total = subtotal - discount + taxAmount;
 
+  const mapReceipt = (r: ApiPosReceipt): PosReceipt => ({
+    id: r.id,
+    receipt_ref: r.receiptNumber || r.id.slice(0, 8),
+    customer_name: r.customerName || 'Walk-in',
+    customer_phone: r.customerPhone || '',
+    items: (r.lines || []).map((l) => ({
+      id: l.productId || l.name,
+      name: l.name,
+      price: Number(l.price),
+      qty: l.quantity,
+      sku: '',
+    })),
+    subtotal: Number(r.subtotal) || 0,
+    discount: Number(r.discount) || 0,
+    tax: 0,
+    total: Number(r.total) || 0,
+    payment_method: r.paymentMethod || 'Cash',
+    receipt_status: (r.status || 'active').toLowerCase() === 'cancelled' ? 'cancelled' : 'active',
+    staff_name: user?.name || '',
+    created_at: r.createdAt || new Date().toISOString(),
+  });
+
   const fetchReceipts = useCallback(async () => {
+    if (!shopId) {
+      setReceiptsLoading(false);
+      return;
+    }
     setReceiptsLoading(true);
     try {
-      const { data } = await supabase
-        .from('pos_receipts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (data) setReceipts(data as PosReceipt[]);
+      const page = await posApi.listReceipts(shopId);
+      setReceipts((page.content || []).map(mapReceipt));
+      setTodayCancels((page.content || []).filter((r) => (r.status || '').toUpperCase() === 'CANCELLED').length);
     } catch { /* ignore */ }
     setReceiptsLoading(false);
-  }, [supabase]);
+  }, [shopId, user?.name]);
 
-  const fetchTodayCancels = useCallback(async () => {
-    if (!user) return;
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const { count } = await supabase
-        .from('receipt_cancellations')
-        .select('*', { count: 'exact', head: true })
-        .eq('staff_id', user.id)
-        .eq('cancel_date', today);
-      setTodayCancels(count || 0);
-    } catch { /* ignore */ }
-  }, [supabase, user]);
+  useEffect(() => {
+    if (!shopId) return;
+    productsApi.listMerchant(shopId, { limit: 200 }).then((p) => setProducts(p.content || [])).catch(() => {});
+  }, [shopId]);
 
   useEffect(() => {
     fetchReceipts();
-    fetchTodayCancels();
-
-    const channel = supabase
-      .channel('pos_receipts_live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_receipts' }, () => {
-        fetchReceipts();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [fetchReceipts, fetchTodayCancels, supabase]);
+    const interval = setInterval(fetchReceipts, 30000);
+    return () => clearInterval(interval);
+  }, [fetchReceipts]);
 
   const addToCart = (product: typeof products[0]) => {
     setCart(prev => {
@@ -134,29 +139,22 @@ export default function POSClient() {
   };
 
   const processCheckout = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || !shopId) return;
     setProcessing(true);
     setErrorMsg('');
     try {
-      const ref = `RCP-${Date.now()}`;
-      const { error } = await supabase.from('pos_receipts').insert({
-        receipt_ref: ref,
-        shop_id: null,
-        shop_name: user?.shopId ? 'GlowSkin Store' : 'BS Online Shop',
-        staff_id: user?.id || '',
-        staff_name: user?.name || '',
-        customer_name: customerName || 'Walk-in Customer',
-        customer_phone: customerPhone,
-        items: cart,
-        subtotal,
+      const created = await posApi.completeSale(shopId, {
+        customerName: customerName || 'Walk-in Customer',
+        customerPhone,
+        paymentMethod: paymentMethod.toUpperCase(),
         discount,
-        tax: taxAmount,
-        total,
-        payment_method: paymentMethod,
-        receipt_status: 'active',
+        lines: cart.map((i) => ({
+          productId: i.id,
+          quantity: i.qty,
+          unitPrice: i.price,
+        })),
       });
-      if (error) throw error;
-      setSuccessMsg(`Receipt ${ref} created successfully!`);
+      setSuccessMsg(`Receipt ${created.receiptNumber || created.id} created successfully!`);
       clearCart();
       setTimeout(() => setSuccessMsg(''), 4000);
       fetchReceipts();
@@ -177,29 +175,11 @@ export default function POSClient() {
   };
 
   const confirmCancel = async () => {
-    if (!cancelModal.receipt || !cancelReason.trim()) return;
+    if (!cancelModal.receipt || !cancelReason.trim() || !shopId) return;
     setProcessing(true);
     try {
-      const { error: receiptError } = await supabase
-        .from('pos_receipts')
-        .update({
-          receipt_status: 'cancelled',
-          cancelled_by: user?.name || '',
-          cancel_reason: cancelReason,
-          cancelled_at: new Date().toISOString(),
-        })
-        .eq('id', cancelModal.receipt.id);
-      if (receiptError) throw receiptError;
-
-      await supabase.from('receipt_cancellations').insert({
-        receipt_id: cancelModal.receipt.id,
-        staff_id: user?.id || '',
-        staff_name: user?.name || '',
-        cancel_date: new Date().toISOString().split('T')[0],
-        reason: cancelReason,
-      });
-
-      setTodayCancels(prev => prev + 1);
+      await posApi.cancelReceipt(cancelModal.receipt.id, shopId);
+      setTodayCancels((prev) => prev + 1);
       setCancelModal({ open: false, receipt: null });
       setSuccessMsg('Receipt cancelled successfully.');
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -217,8 +197,7 @@ export default function POSClient() {
   };
 
   return (
-    <DashboardLayout title="POS System" subtitle="Point of Sale — process walk-in sales">
-      {/* Alerts */}
+    <>{/* Alerts */}
       {successMsg && (
         <div className="mb-4 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
           <Icon name="CheckCircleIcon" size={18} className="text-green-600 shrink-0" />
@@ -509,6 +488,6 @@ export default function POSClient() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

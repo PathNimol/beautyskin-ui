@@ -1,7 +1,8 @@
 import { apiFetch } from '../client';
+import { normalizePage } from '../normalizePage';
 import type { ApiProduct, PageData } from '../types';
 
-export function listCatalog(params?: {
+export async function listCatalog(params?: {
   search?: string;
   category?: string;
   minPrice?: string;
@@ -18,7 +19,8 @@ export function listCatalog(params?: {
   if (params?.sort) q.set('sort', params.sort);
   q.set('page', String(params?.page ?? 1));
   q.set('limit', String(params?.limit ?? 24));
-  return apiFetch<PageData<ApiProduct>>(`/products?${q}`, {}, false);
+  const raw = await apiFetch<unknown>(`/products?${q}`, {}, false);
+  return normalizePage<ApiProduct>(raw);
 }
 
 export function getProduct(id: string) {
@@ -35,8 +37,9 @@ export function listMerchant(shopId: string, params?: { search?: string; categor
   return apiFetch<PageData<ApiProduct>>(`/products/merchant?${q}`);
 }
 
-export function getFeatured(page = 1, limit = 8) {
-  return apiFetch<PageData<ApiProduct>>(`/catalog/featured?page=${page}&limit=${limit}`, {}, false);
+export async function getFeatured(page = 1, limit = 8) {
+  const raw = await apiFetch<unknown>(`/catalog/featured?page=${page}&limit=${limit}`, {}, false);
+  return normalizePage<ApiProduct>(raw);
 }
 
 export function getReviews(productId: string, page = 1, limit = 20) {
@@ -48,4 +51,22 @@ export function submitReview(productId: string, body: { rating: number; title: s
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+export function createProduct(shopId: string, body: Record<string, unknown>) {
+  return apiFetch<ApiProduct>(`/products/shops/${shopId}`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateProduct(shopId: string, productId: string, body: Record<string, unknown>) {
+  return apiFetch<ApiProduct>(`/products/shops/${shopId}/${productId}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteProduct(shopId: string, productId: string) {
+  return apiFetch<void>(`/products/shops/${shopId}/${productId}`, { method: 'DELETE' });
 }

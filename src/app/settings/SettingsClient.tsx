@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
+import React, { useState, useEffect } from 'react';
 import Icon from '@/components/ui/AppIcon';
+import { userPreferencesApi } from '@/lib/api';
 
 export default function SettingsClient() {
   const [darkMode, setDarkMode] = useState(false);
@@ -14,14 +14,41 @@ export default function SettingsClient() {
     promotions: true,
   });
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  useEffect(() => {
+    userPreferencesApi.get()
+      .then((p) => {
+        setDarkMode(p.darkMode);
+        setNotifications({
+          lowStock: p.lowStockAlerts,
+          newOrders: p.orderUpdates,
+          expiryAlerts: p.lowStockAlerts,
+          reviews: false,
+          promotions: p.promotions,
+        });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      await userPreferencesApi.update({
+        darkMode,
+        lowStockAlerts: notifications.lowStock,
+        orderUpdates: notifications.newOrders,
+        promotions: notifications.promotions,
+        emailNotifications: true,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      // silent
+    }
   };
 
   return (
-    <DashboardLayout title="Settings" subtitle="Platform and account preferences">
       <div className="max-w-2xl space-y-6">
         {/* Success */}
         {saved && (
@@ -100,6 +127,5 @@ export default function SettingsClient() {
           Save Settings
         </button>
       </div>
-    </DashboardLayout>
   );
 }

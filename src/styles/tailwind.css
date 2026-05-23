@@ -75,6 +75,28 @@
     100% { opacity: 1; transform: translateY(0); }
   }
 
+  .dashboard-page-enter {
+    animation: animationIn 0.22s ease-out;
+  }
+
+  @keyframes navigationProgress {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(120%); }
+    100% { transform: translateX(300%); }
+  }
+
+  .navigation-progress-bar {
+    width: 40%;
+    animation: navigationProgress 1s ease-in-out infinite;
+  }
+
+  /* Only dim storefront pages — dashboard sidebar links skip nav progress */
+  html[data-navigating] main:not([data-page-content]),
+  html[data-navigating] body > main {
+    opacity: 0.92;
+    transition: opacity 0.15s ease-out;
+  }
+
   @keyframes animationIn {
     0% { opacity: 0; transform: translateY(24px); filter: blur(6px); }
     100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
@@ -207,24 +229,6 @@
 
   .shadow-card {
     box-shadow: 0 2px 16px rgba(43, 43, 43, 0.06), 0 1px 4px rgba(43, 43, 43, 0.04);
-  }
-
-  /* Grid decorative lines */
-  .grid-lines-overlay {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 1;
-    display: flex;
-    justify-content: space-between;
-    padding: 0 1.5rem;
-    opacity: 0.06;
-  }
-
-  .grid-line-v {
-    width: 1px;
-    height: 100%;
-    background: linear-gradient(to bottom, transparent, var(--foreground), transparent);
   }
 
   /* Dot pattern bg */
