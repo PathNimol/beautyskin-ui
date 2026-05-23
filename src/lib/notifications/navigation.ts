@@ -12,6 +12,8 @@ export const NOTIFICATION_LINKS = {
   ownerOrders: '/owner/orders',
   ownerInventory: '/owner/inventory',
   adminInventory: '/admin/inventory',
+  ownerRevokeRequests: '/owner/revoke-requests',
+  staffRevokeRequests: '/staff/revoke-requests',
 } as const;
 
 export function resolveNotificationHref(
@@ -58,6 +60,15 @@ export function resolveNotificationHref(
   if (n.type === 'low_stock' || n.type === 'expiry_alert') {
     if (roleKey === 'admin') return NOTIFICATION_LINKS.adminInventory;
     if (roleKey === 'owner' || roleKey === 'staff') return NOTIFICATION_LINKS.ownerInventory;
+  }
+
+  if (
+    n.type === 'product_revoke' ||
+    title.includes('revoke request') ||
+    message.includes('revoke')
+  ) {
+    if (roleKey === 'owner') return NOTIFICATION_LINKS.ownerRevokeRequests;
+    if (roleKey === 'staff') return NOTIFICATION_LINKS.staffRevokeRequests;
   }
 
   if (roleKey === 'admin') return '/admin/dashboard';

@@ -118,7 +118,8 @@ export interface DbNotification {
     | 'review'
     | 'system'
     | 'shop_approval'
-    | 'shop_name_change';
+    | 'shop_name_change'
+    | 'product_revoke';
   title: string;
   message: string;
   is_read: boolean;

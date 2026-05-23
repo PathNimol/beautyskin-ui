@@ -31,6 +31,31 @@
   --cream-deep: #E8D5C8;
 }
 
+.dark {
+  --background: #1a1618;
+  --foreground: #f5ebe8;
+  --primary: #c4848a;
+  --primary-foreground: #1a1618;
+  --secondary: #2a2226;
+  --secondary-foreground: #f5ebe8;
+  --accent: #d4a373;
+  --accent-foreground: #1a1618;
+  --muted: #2a2226;
+  --muted-foreground: #b8a8a2;
+  --card: #241e21;
+  --card-foreground: #f5ebe8;
+  --border: #3d3238;
+  --input: #2a2226;
+  --ring: #c4848a;
+  --admin-bg: #1a1618;
+  --admin-sidebar: #241e21;
+  --admin-card: #2a2226;
+  --rose-deep: #e8b4b8;
+  --rose-light: #5c3d42;
+  --gold-deep: #d4a373;
+  --cream-deep: #3d3238;
+}
+
 @layer base {
   * {
     box-sizing: border-box;

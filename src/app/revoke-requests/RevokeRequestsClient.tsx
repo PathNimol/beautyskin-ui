@@ -4,7 +4,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { revokeRequestsApi, productsApi } from '@/lib/api';
+import { ApiError } from '@/lib/api/client';
 import type { ApiProduct } from '@/lib/api/types';
+import { broadcastNotificationsRefresh } from '@/hooks/useRealtimeData';
 
 interface RevokeRequest {
   id: string;
@@ -33,8 +35,15 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: 'bg-red-50 text-red-600 border-red-200',
 };
 
+function apiErrorMessage(e: unknown, fallback: string): string {
+  if (e instanceof ApiError) return e.message;
+  if (e instanceof Error) return e.message;
+  return fallback;
+}
+
 export default function RevokeRequestsClient() {
-  const { user, role, shopId } = useMockAuth();
+  const { user, role, shopId: authShopId } = useMockAuth();
+  const shopId = authShopId ?? user?.shopId ?? null;
 
   const [requests, setRequests] = useState<RevokeRequest[]>([]);
   const [merchantProducts, setMerchantProducts] = useState<ApiProduct[]>([]);
@@ -58,27 +67,31 @@ export default function RevokeRequestsClient() {
   const fetchRequests = useCallback(async () => {
     if (!shopId) {
       setLoading(false);
+      setErrorMsg('No shop is assigned to your account. Contact your shop owner or admin.');
       return;
     }
     setLoading(true);
+    setErrorMsg('');
     try {
       const page = await revokeRequestsApi.list(shopId);
       setRequests(
         (page.content || []).map((r) => ({
           id: r.id,
           product_name: r.productName || '',
-          sku: '',
+          sku: r.sku || '',
           quantity: r.quantity,
           reason: (r.reason?.toLowerCase() || 'other') as RevokeRequest['reason'],
           reason_detail: r.detail || '',
           status: (r.status?.toLowerCase() || 'pending') as RevokeRequest['status'],
-          requester_name: '',
-          review_notes: null,
+          requester_name: r.requesterName || r.requesterEmail || '—',
+          review_notes: r.reviewNotes || null,
           created_at: r.createdAt || '',
           reviewed_at: null,
         }))
       );
-    } catch { /* ignore */ }
+    } catch (e: unknown) {
+      setErrorMsg(apiErrorMessage(e, 'Failed to load revoke requests'));
+    }
     setLoading(false);
   }, [shopId]);
 
@@ -105,13 +118,14 @@ export default function RevokeRequestsClient() {
         reason: form.reason.toUpperCase(),
         detail: form.reason_detail,
       });
-      setSuccessMsg('Revoke request submitted successfully!');
+      setSuccessMsg('Revoke request submitted. Your shop owner will be notified.');
+      broadcastNotificationsRefresh();
       setShowForm(false);
       setForm({ product_id: '', product_name: '', sku: '', quantity: 1, reason: 'expired', reason_detail: '' });
       setTimeout(() => setSuccessMsg(''), 4000);
       fetchRequests();
     } catch (e: unknown) {
-      setErrorMsg(e instanceof Error ? e.message : 'Failed to submit request');
+      setErrorMsg(apiErrorMessage(e, 'Failed to submit request'));
     }
     setSaving(false);
   };
@@ -129,11 +143,14 @@ export default function RevokeRequestsClient() {
       setSuccessMsg(`Request ${reviewModal.action}.`);
       setTimeout(() => setSuccessMsg(''), 3000);
       fetchRequests();
-    } catch { /* ignore */ }
+    } catch (e: unknown) {
+      setErrorMsg(apiErrorMessage(e, 'Failed to review request'));
+    }
     setSaving(false);
   };
 
   const pendingCount = requests.filter(r => r.status === 'pending').length;
+  const canReview = role === 'owner' || role === 'admin';
 
   return (
     <>{successMsg && (
@@ -290,7 +307,7 @@ export default function RevokeRequestsClient() {
                       <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${STATUS_COLORS[r.status]}`}>{r.status}</span>
                     </td>
                     <td className="px-4 py-3">
-                      {role === 'owner' && r.status === 'pending' && (
+                      {canReview && r.status === 'pending' && (
                         <div className="flex gap-1">
                           <button
                             onClick={() => setReviewModal({ open: true, request: r, action: 'approved' })}

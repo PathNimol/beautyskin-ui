@@ -83,7 +83,7 @@ export default function RegisterPage() {
     setRegisterError('');
     if (selectedRole !== 'Customer') {
       setRegisterError(
-        'Self-registration is only for shoppers (Customer). Staff, Owner, and Admin accounts are provisioned separately — use Sign in with demo credentials.'
+        'Self-registration is only for shoppers (Customer). Staff, Owner, and Admin accounts are provisioned by your shop or platform admin.'
       );
       return;
     }

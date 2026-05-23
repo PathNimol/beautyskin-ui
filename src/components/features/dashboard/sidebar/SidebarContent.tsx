@@ -62,6 +62,9 @@ export default function SidebarContent({
       {!collapsed && role && (
         <Link
           href={profileHref(role)}
+          scroll={false}
+          data-skip-nav-progress
+          onClick={() => onNavClick(profileHref(role))}
           className="px-4 py-3 border-b border-border flex items-center gap-2.5 hover:bg-secondary transition-colors group"
         >
           <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-primary/30 shrink-0">

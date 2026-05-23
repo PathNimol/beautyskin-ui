@@ -38,6 +38,7 @@ export default function ProductsClient() {
     sold: p.sold,
     sku: p.sku,
     image: p.image,
+    imageAlt: p.image_alt || p.name,
     status: p.product_status,
   }));
   const [search, setSearch] = useState('');

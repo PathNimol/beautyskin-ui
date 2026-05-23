@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
@@ -9,7 +9,10 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { useRealtimeNotifications, type DbNotification } from '@/hooks/useRealtimeData';
 import { useNotificationClick } from '@/hooks/useNotificationClick';
+import { NOTIF_COLOR, NOTIF_ICON } from '@/lib/notifications/display';
 import type { UserRole } from '@/lib/mock/data';
+import { useDashboardNav } from '@/contexts/DashboardNavContext';
+import { profileHref as profilePathForRole } from '@/components/features/dashboard/sidebar/nav-items';
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Super Admin',
@@ -18,36 +21,6 @@ const ROLE_LABELS: Record<UserRole, string> = {
   customer: 'Customer',
   buyer: 'Customer',
 };
-
-const NOTIF_ICON: Record<DbNotification['type'], string> = {
-  new_order: 'ShoppingBagIcon',
-  low_stock: 'ExclamationTriangleIcon',
-  expiry_alert: 'ClockIcon',
-  promotion: 'TagIcon',
-  review: 'StarIcon',
-  system: 'BellIcon',
-  shop_approval: 'BuildingStorefrontIcon',
-  shop_name_change: 'PencilSquareIcon',
-};
-
-const NOTIF_COLOR: Record<DbNotification['type'], string> = {
-  new_order: 'bg-green-50 text-green-600',
-  low_stock: 'bg-red-50 text-red-500',
-  expiry_alert: 'bg-amber-50 text-amber-500',
-  promotion: 'bg-purple-50 text-purple-500',
-  review: 'bg-blue-50 text-blue-500',
-  system: 'bg-secondary text-muted-foreground',
-  shop_approval: 'bg-amber-50 text-amber-600',
-  shop_name_change: 'bg-violet-50 text-violet-600',
-};
-
-function profileHref(role: UserRole | null): string {
-  if (!role) return '/';
-  if (role === 'customer' || role === 'buyer') return '/customer/account';
-  if (role === 'owner') return '/owner/dashboard';
-  if (role === 'staff') return '/staff/dashboard';
-  return '/admin/dashboard';
-}
 
 // ─── Toast Notification ───────────────────────────────────────────────────────
 function NotifToast({ notif, onDismiss }: { notif: DbNotification; onDismiss: () => void }) {
@@ -78,6 +51,9 @@ function NotifToast({ notif, onDismiss }: { notif: DbNotification; onDismiss: ()
 export default function DashboardHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   const { user, role, signOut } = useMockAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const { beginNavigationIfNeeded } = useDashboardNav();
+  const accountHref = profilePathForRole(role);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
@@ -247,8 +223,11 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
             {profileOpen && (
               <div className="absolute right-0 top-11 w-52 bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden">
                 <Link
-                  href={profileHref(role)}
-                  onClick={() => setProfileOpen(false)}
+                  href={accountHref}
+                  onClick={() => {
+                    setProfileOpen(false);
+                    beginNavigationIfNeeded(accountHref, pathname);
+                  }}
                   className="px-4 py-3 border-b border-border flex items-center gap-2 hover:bg-secondary transition-colors group"
                 >
                   <div className="flex-1 min-w-0">
@@ -267,8 +246,11 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
                 </Link>
                 <div className="p-2">
                   <Link
-                    href={profileHref(role)}
-                    onClick={() => setProfileOpen(false)}
+                    href={accountHref}
+                    onClick={() => {
+                      setProfileOpen(false);
+                      beginNavigationIfNeeded(accountHref, pathname);
+                    }}
                     className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary transition-all"
                   >
                     <Icon name="UserCircleIcon" size={15} />
@@ -303,7 +285,7 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
 
       {/* Toast Stack */}
       {toastQueue.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-[500] flex flex-col gap-3 pointer-events-none">
+        <div className="fixed top-20 right-6 z-[500] flex flex-col gap-3 pointer-events-none">
           {toastQueue.slice(0, 4).map((n) => (
             <div key={n.id} className="pointer-events-auto">
               <NotifToast notif={n} onDismiss={() => dismissToast(n.id)} />

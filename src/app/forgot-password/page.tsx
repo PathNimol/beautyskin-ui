@@ -6,13 +6,6 @@ import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
 import { authApi } from '@/lib/api';
 
-const VALID_EMAILS = [
-  'admin@beautyskin.com',
-  'owner@beautyskin.com',
-  'staff@beautyskin.com',
-  'buyer@beautyskin.com',
-];
-
 type Step = 'email' | 'otp' | 'reset' | 'done';
 
 // ── Password strength helper ──────────────────────────────────────────────────
@@ -87,7 +80,7 @@ export default function ForgotPasswordPage() {
       if (code === '123456') {
         setStep('reset');
       } else {
-        setError('Invalid OTP. Use 123456 for demo.');
+        setError('Invalid verification code. Please try again.');
         setOtp(['', '', '', '', '', '']);
         otpRefs[0].current?.focus();
       }
@@ -197,9 +190,6 @@ export default function ForgotPasswordPage() {
                     required
                     className="w-full px-4 py-3 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                   />
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    Try: admin@beautyskin.com, buyer@beautyskin.com
-                  </p>
                 </div>
                 <button
                   type="submit"
@@ -266,10 +256,6 @@ export default function ForgotPasswordPage() {
                     'Verify Code'
                   )}
                 </button>
-                <p className="text-center text-xs text-muted-foreground mt-4">
-                  Demo hint: use{' '}
-                  <span className="font-mono font-semibold text-foreground">123456</span>
-                </p>
               </form>
             </>
           )}

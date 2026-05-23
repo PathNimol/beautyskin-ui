@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import { useMockAuth } from '@/contexts/MockAuthContext';
+import { roleScopedPath } from '@/lib/auth/redirects';
 import { useRealtimeOrders, useRealtimeInventory, useRealtimeShops } from '@/hooks/useRealtimeData';
 import { useShopDashboard } from '@/hooks/useApiLists';
 import { supplierPurchasesApi } from '@/lib/api';
@@ -482,19 +483,19 @@ export default function DashboardClient() {
                 [
                   {
                     label: 'Manage Shops',
-                    href: '/shops',
+                    href: roleScopedPath(role, 'shops'),
                     icon: 'BuildingStorefrontIcon',
                     color: 'bg-purple-50 text-purple-600 hover:bg-purple-100',
                   },
                   {
                     label: 'View Reports',
-                    href: '/reports',
+                    href: roleScopedPath(role, 'reports'),
                     icon: 'ChartBarIcon',
                     color: 'bg-blue-50 text-blue-600 hover:bg-blue-100',
                   },
                   {
                     label: 'All Orders',
-                    href: '/orders',
+                    href: roleScopedPath(role, 'orders'),
                     icon: 'ClipboardDocumentListIcon',
                     color: 'bg-green-50 text-green-600 hover:bg-green-100',
                   },
@@ -518,19 +519,19 @@ export default function DashboardClient() {
                 [
                   {
                     label: 'POS System',
-                    href: '/pos',
+                    href: roleScopedPath(role, 'pos'),
                     icon: 'ComputerDesktopIcon',
                     color: 'bg-rose-50 text-rose-600 hover:bg-rose-100',
                   },
                   {
                     label: 'New Purchase',
-                    href: '/supplier-purchases',
+                    href: roleScopedPath(role, 'purchases'),
                     icon: 'TruckIcon',
                     color: 'bg-blue-50 text-blue-600 hover:bg-blue-100',
                   },
                   {
                     label: 'Inventory',
-                    href: '/inventory',
+                    href: roleScopedPath(role, 'inventory'),
                     icon: 'CubeIcon',
                     color: 'bg-green-50 text-green-600 hover:bg-green-100',
                   },
@@ -554,19 +555,19 @@ export default function DashboardClient() {
                 [
                   {
                     label: 'POS System',
-                    href: '/pos',
+                    href: roleScopedPath(role, 'pos'),
                     icon: 'ComputerDesktopIcon',
                     color: 'bg-rose-50 text-rose-600 hover:bg-rose-100',
                   },
                   {
                     label: 'Revoke Request',
-                    href: '/revoke-requests',
+                    href: roleScopedPath(role, 'revoke-requests'),
                     icon: 'ExclamationTriangleIcon',
                     color: 'bg-amber-50 text-amber-600 hover:bg-amber-100',
                   },
                   {
                     label: 'Inventory',
-                    href: '/inventory',
+                    href: roleScopedPath(role, 'inventory'),
                     icon: 'CubeIcon',
                     color: 'bg-green-50 text-green-600 hover:bg-green-100',
                   },

@@ -73,6 +73,22 @@ export function resolvePostLoginPath(
 /** @deprecated Use resolvePostLoginPath */
 export const sanitizeRedirect = resolvePostLoginPath;
 
+/** Prefix a path with the role console segment (e.g. staff + pos → /staff/pos). */
+export function roleScopedPath(role: UserRole | string | null, segment: string): string {
+  const key = normalizeRoleKey(role);
+  const path = segment.replace(/^\//, '');
+  switch (key) {
+    case 'admin':
+      return `/admin/${path}`;
+    case 'owner':
+      return `/owner/${path}`;
+    case 'staff':
+      return `/staff/${path}`;
+    default:
+      return `/${path}`;
+  }
+}
+
 export function isDashboardPath(path: string): boolean {
   return (
     path.startsWith('/admin/') ||

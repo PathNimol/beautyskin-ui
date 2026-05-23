@@ -5,6 +5,7 @@ import DashboardPageOutlet from '@/components/dashboard/DashboardPageOutlet';
 import { usePathname, useRouter } from 'next/navigation';
 import DashboardSidebar from './features/dashboard/sidebar';
 import DashboardHeader from '@/components/DashboardHeader';
+import OwnerRevokeAlertsBanner from '@/components/features/dashboard/OwnerRevokeAlertsBanner';
 import DashboardShellSkeleton from '@/components/ui/DashboardShellSkeleton';
 import { DashboardNavProvider, useDashboardNav } from '@/contexts/DashboardNavContext';
 import { useMockAuth } from '@/contexts/MockAuthContext';
@@ -50,6 +51,7 @@ function DashboardShellInner({ children }: DashboardShellProps) {
           className="flex-1 overflow-auto px-6 pt-6 pb-14 md:px-8 md:pt-8 md:pb-20"
           data-page-content
         >
+          <OwnerRevokeAlertsBanner />
           <DashboardPageOutlet>{children}</DashboardPageOutlet>
         </main>
       </div>

@@ -8,6 +8,10 @@ const EXACT: Record<string, DashboardPageMeta> = {
     title: 'My Account',
     subtitle: 'Profile and shipping details for faster checkout',
   },
+  '/staff/account': {
+    title: 'My Account',
+    subtitle: 'Staff profile and contact details',
+  },
   '/customer/products': {
     title: 'All Products',
     subtitle: 'Browse skincare from every shop on the platform',
@@ -38,6 +42,10 @@ const EXACT: Record<string, DashboardPageMeta> = {
   '/staff/inventory': { title: 'Inventory', subtitle: 'Stock levels and adjustments' },
   '/staff/orders': { title: 'Orders', subtitle: 'Process customer orders' },
   '/staff/pos': { title: 'POS System', subtitle: 'In-store checkout' },
+  '/owner/revoke-requests': {
+    title: 'Revoke Requests',
+    subtitle: 'Review staff requests to remove expired or damaged products',
+  },
   '/staff/revoke-requests': {
     title: 'Revoke Requests',
     subtitle: 'Request removal of expired or tester products',

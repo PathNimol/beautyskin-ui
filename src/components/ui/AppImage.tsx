@@ -107,10 +107,12 @@ const AppImage = memo(function AppImage({
     return classes.filter(Boolean).join(' ');
   }, [className, isLoading, onClick]);
 
+  const resolvedAlt = (alt?.trim() || 'Image').trim();
+
   const imageProps = useMemo(() => {
     const baseProps: any = {
       src: imageSrc,
-      alt,
+      alt: resolvedAlt,
       className: imageClassName,
       quality,
       placeholder,
@@ -130,7 +132,7 @@ const AppImage = memo(function AppImage({
     return baseProps;
   }, [
     imageSrc,
-    alt,
+    resolvedAlt,
     imageClassName,
     quality,
     placeholder,

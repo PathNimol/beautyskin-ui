@@ -220,6 +220,7 @@ export function mapApiNotification(n: ApiNotification): DbNotification {
     'review',
     'shop_approval',
     'shop_name_change',
+    'product_revoke',
     'system',
   ];
   const type = known.includes(raw as DbNotification['type'])

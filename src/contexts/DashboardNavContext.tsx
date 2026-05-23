@@ -6,6 +6,7 @@ type DashboardNavContextValue = {
   pendingPath: string | null;
   isNavigating: boolean;
   beginNavigation: (href: string) => void;
+  beginNavigationIfNeeded: (href: string, currentPath: string) => void;
   completeNavigation: () => void;
 };
 
@@ -20,6 +21,16 @@ export function DashboardNavProvider({ children }: { children: React.ReactNode }
     setIsNavigating(true);
   }, []);
 
+  const beginNavigationIfNeeded = useCallback(
+    (href: string, currentPath: string) => {
+      if (currentPath === href || currentPath.startsWith(`${href}/`)) {
+        return;
+      }
+      beginNavigation(href);
+    },
+    [beginNavigation]
+  );
+
   const completeNavigation = useCallback(() => {
     setIsNavigating(false);
     setPendingPath(null);
@@ -27,7 +38,13 @@ export function DashboardNavProvider({ children }: { children: React.ReactNode }
 
   return (
     <DashboardNavContext.Provider
-      value={{ pendingPath, isNavigating, beginNavigation, completeNavigation }}
+      value={{
+        pendingPath,
+        isNavigating,
+        beginNavigation,
+        beginNavigationIfNeeded,
+        completeNavigation,
+      }}
     >
       {children}
     </DashboardNavContext.Provider>
@@ -41,6 +58,7 @@ export function useDashboardNav() {
       pendingPath: null,
       isNavigating: false,
       beginNavigation: () => {},
+      beginNavigationIfNeeded: () => {},
       completeNavigation: () => {},
     };
   }

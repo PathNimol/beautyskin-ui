@@ -10,33 +10,6 @@ import { useMockAuth } from '@/contexts/MockAuthContext';
 import SocialAuthButtons, { type OAuthProvider } from '@/components/auth/SocialAuthButtons';
 import { resolvePostLoginPath } from '@/lib/auth/redirects';
 
-const ROLE_HINTS = [
-  {
-    role: 'Super Admin',
-    email: 'admin@beautyskin.com',
-    password: 'admin123',
-    color: 'bg-purple-50 text-purple-700 border-purple-200',
-  },
-  {
-    role: 'Shop Owner',
-    email: 'owner@beautyskin.com',
-    password: 'owner123',
-    color: 'bg-rose-50 text-rose-700 border-rose-200',
-  },
-  {
-    role: 'Staff',
-    email: 'staff@beautyskin.com',
-    password: 'staff123',
-    color: 'bg-blue-50 text-blue-700 border-blue-200',
-  },
-  {
-    role: 'Customer',
-    email: 'buyer@beautyskin.com',
-    password: 'buyer123',
-    color: 'bg-green-50 text-green-700 border-green-200',
-  },
-];
-
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -85,7 +58,7 @@ function LoginForm() {
       setLoading(false);
       goAfterLogin(redirectParam, signedInUser.role);
     } catch {
-      setError('Invalid email or password. Try demo credentials below or register.');
+      setError('Invalid email or password. Please try again or create an account.');
       setLoading(false);
       navigatingRef.current = false;
     }
@@ -110,11 +83,6 @@ function LoginForm() {
       loading={loading}
       handleLogin={handleLogin}
       handleOAuth={handleOAuth}
-      fillCredentials={(e, p) => {
-        setEmail(e);
-        setPassword(p);
-        setError('');
-      }}
     />
   );
 }
@@ -130,7 +98,6 @@ function MotionLoginForm(props: {
   loading: boolean;
   handleLogin: (e: React.FormEvent) => void;
   handleOAuth: (p: OAuthProvider) => void;
-  fillCredentials: (e: string, p: string) => void;
 }) {
   const {
     email,
@@ -143,7 +110,6 @@ function MotionLoginForm(props: {
     loading,
     handleLogin,
     handleOAuth,
-    fillCredentials,
   } = props;
 
   return (
@@ -230,26 +196,6 @@ function MotionLoginForm(props: {
             Create account
           </Link>
         </p>
-
-        <div className="mt-8 p-5 bg-secondary/60 rounded-2xl border border-border">
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
-            Demo Credentials
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            {ROLE_HINTS.map((hint) => (
-              <button
-                key={hint.role}
-                type="button"
-                disabled={loading}
-                onClick={() => fillCredentials(hint.email, hint.password)}
-                className={`text-left p-3 rounded-xl border text-xs transition-all hover:shadow-soft disabled:opacity-50 ${hint.color}`}
-              >
-                <p className="font-bold">{hint.role}</p>
-                <p className="opacity-70 mt-0.5 truncate">{hint.email}</p>
-              </button>
-            ))}
-          </div>
-        </div>
 
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">

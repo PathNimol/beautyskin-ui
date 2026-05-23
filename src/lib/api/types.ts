@@ -336,10 +336,14 @@ export interface ApiRevokeRequest {
   shopId?: string;
   productId?: string;
   productName?: string;
+  sku?: string;
   quantity: number;
   reason: string;
   detail?: string;
   status: string;
+  reviewNotes?: string;
+  requesterEmail?: string;
+  requesterName?: string;
   createdAt?: string;
 }
 
@@ -399,6 +403,8 @@ export interface ApiUserPreferences {
   orderUpdates: boolean;
   promotions: boolean;
   lowStockAlerts: boolean;
+  expiryAlerts?: boolean;
+  reviewAlerts?: boolean;
   emailNotifications: boolean;
 }
 

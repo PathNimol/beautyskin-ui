@@ -145,6 +145,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['owner'],
     section: 'management',
   },
+  {
+    label: 'Revoke Requests',
+    icon: 'ExclamationTriangleIcon',
+    href: '/owner/revoke-requests',
+    roles: ['owner'],
+    section: 'shop',
+  },
   // Staff
   {
     label: 'Dashboard',
@@ -185,6 +192,13 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Revoke Requests',
     icon: 'ExclamationTriangleIcon',
     href: '/staff/revoke-requests',
+    roles: ['staff'],
+    section: 'staff',
+  },
+  {
+    label: 'My Account',
+    icon: 'UserCircleIcon',
+    href: '/staff/account',
     roles: ['staff'],
     section: 'staff',
   },
@@ -267,7 +281,7 @@ export const ROLE_LABELS: Record<string, string> = {
 export function profileHref(role: string | null): string {
   if (!role) return '/';
   if (role === 'customer' || role === 'buyer') return '/customer/account';
-  if (role === 'owner') return '/owner/account';
   if (role === 'staff') return '/staff/account';
+  if (role === 'owner') return '/settings';
   return '/admin/dashboard';
 }
