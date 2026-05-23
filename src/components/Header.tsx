@@ -17,8 +17,14 @@ const navLinks = [
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // ✅ mounted guards ALL auth-dependent rendering — server always sees false
+  const [mounted, setMounted] = useState(false);
   const { itemCount: cartCount } = useCart();
   const { isAuthenticated, role, signOut } = useMockAuth();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40);
@@ -37,7 +43,10 @@ export default function Header() {
     };
   }, [menuOpen]);
 
-  const dashboardHref = role === 'customer' || role === 'buyer' ? '/customer/account' : getRoleHomePath(role);
+  // Before mount, treat user as unauthenticated — matches server render
+  const authed = mounted && isAuthenticated;
+  const dashboardHref =
+    role === 'customer' || role === 'buyer' ? '/customer/account' : getRoleHomePath(role);
 
   return (
     <>
@@ -84,14 +93,33 @@ export default function Header() {
               aria-label="Shopping cart"
             >
               <Icon name="ShoppingBagIcon" size={18} />
-              {cartCount > 0 && (
+              {/* Cart count is also client-only — guard with mounted */}
+              {mounted && cartCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-accent text-white text-[9px] font-bold rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
             </Link>
 
-            {isAuthenticated ? (
+            {/* ✅ Auth buttons: before mount render logged-out state (matches SSR) */}
+            {!mounted ? (
+              <>
+                <Link
+                  href="/login"
+                  className="hidden md:flex items-center gap-2 px-4 py-2 bg-secondary text-foreground text-sm font-semibold rounded-xl hover:bg-border transition-all"
+                >
+                  <Icon name="UserIcon" size={15} />
+                  Sign In
+                </Link>
+                <Link
+                  href="/register"
+                  className="hidden md:flex items-center gap-2 px-4 py-2 bg-primary text-foreground text-sm font-semibold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose"
+                >
+                  <Icon name="UserPlusIcon" size={15} />
+                  Register
+                </Link>
+              </>
+            ) : authed ? (
               <>
                 <Link
                   href={dashboardHref}
@@ -138,6 +166,7 @@ export default function Header() {
           </div>
         </div>
       </header>
+
       {/* Mobile Menu Overlay */}
       {menuOpen && (
         <div className="fixed inset-0 z-[100] md:hidden">
@@ -168,7 +197,8 @@ export default function Header() {
                 </Link>
               ))}
               <div className="mt-4 pt-4 border-t border-border space-y-2">
-                {isAuthenticated ? (
+                {/* Mobile menu also guarded by mounted + authed */}
+                {authed ? (
                   <>
                     <Link
                       href={dashboardHref}

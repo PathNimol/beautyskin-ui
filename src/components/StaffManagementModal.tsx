@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import Icon from '@/components/ui/AppIcon';
 import { useRealtimeStaff, type DbStaff } from '@/hooks/useRealtimeData';
-import { createClient } from '@/lib/supabase/client';
+import { shopStaffApi } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StaffRole = 'Owner' | 'Manager' | 'Staff' | 'Cashier';
@@ -185,24 +185,16 @@ export default function StaffManagementModal({ shopId, shopName, onClose }: Staf
     setAddErrors({});
     setAddingStaff(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from('staff').insert({
-        shop_id: shopId,
+      await shopStaffApi.create(shopId, {
         name: newStaff.name.trim(),
         email: newStaff.email.trim(),
         phone: newStaff.phone.trim(),
-        role: newStaff.role,
-        avatar: 'https://img.rocket.new/generatedImages/rocket_gen_img_1d570eb07-1772731577599.png',
-        avatar_alt: `${newStaff.name} staff avatar`,
-        status: 'Active',
+        role: newStaff.role.toUpperCase(),
       });
-      if (error) { showToast('error', error.message); }
-      else {
-        showToast('success', `${newStaff.name} added to ${shopName}.`);
-        setNewStaff({ name: '', email: '', phone: '', role: 'Staff' });
-        setActiveTab('list');
-        refetch();
-      }
+      showToast('success', `${newStaff.name} added to ${shopName}.`);
+      setNewStaff({ name: '', email: '', phone: '', role: 'Staff' });
+      setActiveTab('list');
+      refetch();
     } finally {
       setAddingStaff(false);
     }

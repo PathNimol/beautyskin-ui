@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
@@ -19,196 +19,10 @@ import {
   Cell,
 } from 'recharts';
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+import { useAdminDashboard } from '@/hooks/useApiLists';
+import { mapApiOrderToDashboardRow } from '@/lib/api/mappers';
 
-const revenueData = [
-  { month: 'Jan', revenue: 4200, orders: 87 },
-  { month: 'Feb', revenue: 5800, orders: 112 },
-  { month: 'Mar', revenue: 4900, orders: 95 },
-  { month: 'Apr', revenue: 7200, orders: 148 },
-  { month: 'May', revenue: 8100, orders: 163 },
-  { month: 'Jun', revenue: 6700, orders: 134 },
-  { month: 'Jul', revenue: 9300, orders: 187 },
-  { month: 'Aug', revenue: 8800, orders: 172 },
-  { month: 'Sep', revenue: 10200, orders: 204 },
-  { month: 'Oct', revenue: 9600, orders: 193 },
-  { month: 'Nov', revenue: 11800, orders: 237 },
-  { month: 'Dec', revenue: 13400, orders: 268 },
-];
-
-const salesTrendData = [
-  { day: 'Mon', sales: 1240, returns: 45 },
-  { day: 'Tue', sales: 980, returns: 32 },
-  { day: 'Wed', sales: 1560, returns: 58 },
-  { day: 'Thu', sales: 1120, returns: 41 },
-  { day: 'Fri', sales: 1890, returns: 67 },
-  { day: 'Sat', sales: 2340, returns: 89 },
-  { day: 'Sun', sales: 1780, returns: 63 },
-];
-
-// Sales breakdown by category for pie chart
-const categoryData = [
-  { name: 'Serums', value: 35, color: '#E8B4B8' },
-  { name: 'Moisturisers', value: 25, color: '#D4A373' },
-  { name: 'Sunscreen', value: 18, color: '#A8C5DA' },
-  { name: 'Toners', value: 13, color: '#B5D5C5' },
-  { name: 'Masks', value: 9, color: '#C9B8E8' },
-];
-
-const recentOrders = [
-  {
-    id: '#ORD-2847',
-    customer: 'Emma Rodriguez',
-    product: 'Glow Essence Serum',
-    amount: 28.99,
-    status: 'Delivered',
-    date: 'May 12, 2026',
-    avatar: 'https://img.rocket.new/generatedImages/rocket_gen_img_1b953edb4-1772690319677.png',
-    avatarAlt: 'Young woman with warm smile',
-  },
-  {
-    id: '#ORD-2846',
-    customer: 'Mei-Lin Tanaka',
-    product: 'Snail Mucin Essence',
-    amount: 22.5,
-    status: 'Processing',
-    date: 'May 12, 2026',
-    avatar: 'https://img.rocket.new/generatedImages/rocket_gen_img_18ca1e79a-1773058034288.png',
-    avatarAlt: 'Asian woman with clear skin',
-  },
-  {
-    id: '#ORD-2845',
-    customer: 'Priya Sharma',
-    product: 'UV Shield SPF 50+',
-    amount: 19.99,
-    status: 'Shipped',
-    date: 'May 11, 2026',
-    avatar: 'https://img.rocket.new/generatedImages/rocket_gen_img_1d570eb07-1772731577599.png',
-    avatarAlt: 'South Asian woman confident',
-  },
-  {
-    id: '#ORD-2844',
-    customer: 'Sophie Williams',
-    product: 'Hydra Barrier Cream',
-    amount: 34.0,
-    status: 'Pending',
-    date: 'May 11, 2026',
-    avatar: 'https://img.rocket.new/generatedImages/rocket_gen_img_1e5fc8214-1763301847577.png',
-    avatarAlt: 'Woman with friendly expression',
-  },
-  {
-    id: '#ORD-2843',
-    customer: 'Aiko Nakamura',
-    product: 'Ceramide Repair Toner',
-    amount: 42.0,
-    status: 'Delivered',
-    date: 'May 10, 2026',
-    avatar: 'https://img.rocket.new/generatedImages/rocket_gen_img_1189b0c6b-1763296107547.png',
-    avatarAlt: 'Japanese woman with professional style',
-  },
-  {
-    id: '#ORD-2842',
-    customer: 'Fatima Al-Hassan',
-    product: 'Rice Water Brightener',
-    amount: 31.0,
-    status: 'Cancelled',
-    date: 'May 10, 2026',
-    avatar: 'https://img.rocket.new/generatedImages/rocket_gen_img_1f73eebdf-1773114809765.png',
-    avatarAlt: 'Middle Eastern woman with elegant style',
-  },
-];
-
-const topProducts = [
-  { name: 'Snail Mucin Essence', brand: 'COSRX', sold: 342, revenue: 7695, progress: 92 },
-  { name: 'Glow Essence Serum', brand: 'COSRX', sold: 287, revenue: 8317, progress: 78 },
-  { name: 'Hydra Barrier Cream', brand: 'Laneige', sold: 241, revenue: 8194, progress: 65 },
-  { name: 'Centella Calming Gel', brand: 'Purito', sold: 198, revenue: 3465, progress: 53 },
-  { name: 'UV Shield SPF 50+', brand: 'Skin1004', sold: 167, revenue: 3332, progress: 45 },
-];
-
-const lowStockAlerts = [
-  { name: 'Eye Peptide Cream', stock: 4, threshold: 10, severity: 'critical' },
-  { name: 'Honey Clay Mask', stock: 7, threshold: 15, severity: 'warning' },
-  { name: 'Niacinamide 10% Serum', stock: 11, threshold: 20, severity: 'warning' },
-  { name: 'Retinol Night Serum', stock: 2, threshold: 10, severity: 'critical' },
-];
-
-const expiredProducts = [
-  {
-    name: 'Vitamin C Brightening Serum',
-    batch: 'BCH-0041',
-    expiredOn: 'Apr 30, 2026',
-    qty: 18,
-    shop: 'Main Store',
-  },
-  {
-    name: 'Hyaluronic Mist Spray',
-    batch: 'BCH-0039',
-    expiredOn: 'May 01, 2026',
-    qty: 6,
-    shop: 'Branch A',
-  },
-  {
-    name: 'Collagen Eye Patch',
-    batch: 'BCH-0044',
-    expiredOn: 'May 05, 2026',
-    qty: 24,
-    shop: 'Main Store',
-  },
-];
-
-// ─── KPI Cards ────────────────────────────────────────────────────────────────
-
-const kpis = [
-  {
-    label: 'Total Revenue',
-    value: '$94.2K',
-    change: '+8.3%',
-    positive: true,
-    icon: 'CurrencyDollarIcon',
-    color: 'bg-primary/20 text-rose-deep',
-  },
-  {
-    label: 'Total Orders',
-    value: '2,003',
-    change: '+14.1%',
-    positive: true,
-    icon: 'ClipboardDocumentListIcon',
-    color: 'bg-accent/20 text-gold-deep',
-  },
-  {
-    label: 'Total Products',
-    value: '1,284',
-    change: '-3.2%',
-    positive: false,
-    icon: 'ArchiveBoxIcon',
-    color: 'bg-blue-50 text-blue-600',
-  },
-  {
-    label: 'Total Customers',
-    value: '3,247',
-    change: '+18.7%',
-    positive: true,
-    icon: 'UsersIcon',
-    color: 'bg-green-50 text-green-600',
-  },
-  {
-    label: 'Total Staff',
-    value: '12',
-    change: '+2',
-    positive: true,
-    icon: 'UserGroupIcon',
-    color: 'bg-purple-50 text-purple-600',
-  },
-  {
-    label: 'Daily Sales',
-    value: '$2,847',
-    change: '+12.5%',
-    positive: true,
-    icon: 'ChartBarIcon',
-    color: 'bg-rose-50 text-rose-500',
-  },
-];
+// ─── KPI layout (values filled from GET /api/admin/dashboard) ─────────────────
 
 const statusConfig: Record<string, string> = {
   Delivered: 'badge-success',
@@ -216,6 +30,10 @@ const statusConfig: Record<string, string> = {
   Shipped: 'badge-rose',
   Pending: 'badge-warning',
   Cancelled: 'badge-danger',
+  Confirmed: 'badge-info',
+  Packing: 'badge-info',
+  Shipping: 'badge-rose',
+  Returned: 'badge-danger',
 };
 
 // ─── Tooltip ──────────────────────────────────────────────────────────────────
@@ -308,15 +126,115 @@ function ExportButtons({ onPDF, onExcel }: { onPDF: () => void; onExcel: () => v
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+function formatCount(n: number): string {
+  return n.toLocaleString();
+}
+
+function formatRevenue(amount: number): string {
+  if (amount >= 1000) return `$${(amount / 1000).toFixed(1)}K`;
+  return `$${amount.toFixed(0)}`;
+}
+
 export default function AdminDashboardClient() {
+  const { data: adminData, loading: adminLoading } = useAdminDashboard();
+
+  const kpis = useMemo(
+    () => [
+      {
+        label: 'Total Shops',
+        value: adminLoading ? '—' : formatCount(adminData?.totalShops ?? 0),
+        change: 'Live',
+        positive: true,
+        icon: 'BuildingStorefrontIcon',
+        color: 'bg-blue-50 text-blue-600',
+      },
+      {
+        label: 'Total Orders',
+        value: adminLoading ? '—' : formatCount(adminData?.totalOrders ?? 0),
+        change: 'Live',
+        positive: true,
+        icon: 'ClipboardDocumentListIcon',
+        color: 'bg-accent/20 text-gold-deep',
+      },
+      {
+        label: 'Total Products',
+        value: adminLoading ? '—' : formatCount(adminData?.totalProducts ?? 0),
+        change: 'Live',
+        positive: true,
+        icon: 'ArchiveBoxIcon',
+        color: 'bg-primary/20 text-rose-deep',
+      },
+      {
+        label: 'Total Customers',
+        value: adminLoading ? '—' : formatCount(adminData?.totalCustomers ?? 0),
+        change: 'Live',
+        positive: true,
+        icon: 'UsersIcon',
+        color: 'bg-green-50 text-green-600',
+      },
+      {
+        label: 'Revenue (30d)',
+        value: adminLoading ? '—' : formatRevenue(adminData?.revenue30d ?? 0),
+        change: 'Delivered',
+        positive: true,
+        icon: 'CurrencyDollarIcon',
+        color: 'bg-rose-50 text-rose-600',
+      },
+      {
+        label: 'Pending Orders',
+        value: adminLoading ? '—' : formatCount(adminData?.pendingOrders ?? 0),
+        change: (adminData?.pendingOrders ?? 0) > 0 ? 'Needs action' : 'Clear',
+        positive: (adminData?.pendingOrders ?? 0) === 0,
+        icon: 'ClockIcon',
+        color: 'bg-amber-50 text-amber-700',
+      },
+    ],
+    [adminLoading, adminData]
+  );
+
+  const displayRecentOrders = useMemo(
+    () => (adminData?.recentOrders ?? []).map(mapApiOrderToDashboardRow),
+    [adminData?.recentOrders]
+  );
+
+  const revenueChartData = useMemo(
+    () =>
+      (adminData?.revenueByMonth ?? []).map((r) => ({
+        month: r.month,
+        revenue: r.revenue,
+        orders: r.orders,
+      })),
+    [adminData?.revenueByMonth]
+  );
+
+  const salesChartData = useMemo(
+    () =>
+      (adminData?.salesByDay ?? []).map((d) => ({
+        day: d.day,
+        sales: d.sales,
+        returns: d.returns,
+      })),
+    [adminData?.salesByDay]
+  );
+
+  const categoryChartData = adminData?.categoryBreakdown ?? [];
+  const lowStockAlerts = adminData?.lowStockAlerts ?? [];
+  const expiredProducts = adminData?.expiredProducts ?? [];
+  const topProducts = adminData?.topProducts ?? [];
+
   const [notifOpen, setNotifOpen] = useState(false);
   const [chartPeriod, setChartPeriod] = useState<'weekly' | 'monthly'>('monthly');
   const [activeTab, setActiveTab] = useState<'orders' | 'expired'>('orders');
 
   const totalAlerts = lowStockAlerts.length + expiredProducts.length;
 
+  const lineChartData = chartPeriod === 'monthly' ? revenueChartData : salesChartData;
+  const lineXKey = chartPeriod === 'monthly' ? 'month' : 'day';
+  const linePrimaryKey = chartPeriod === 'monthly' ? 'revenue' : 'sales';
+  const lineSecondaryKey = chartPeriod === 'monthly' ? 'orders' : 'returns';
+
   return (
-    <div className="p-6 md:p-8 min-h-screen bg-admin-bg">
+    <div className="p-6 md:p-8 min-h-screen bg-admin-bg ">
       {/* ── Top Bar ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-8">
         <div className="pl-10 md:pl-0">
@@ -324,7 +242,14 @@ export default function AdminDashboardClient() {
             Dashboard
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Wednesday, May 13, 2026 · Welcome back, Admin
+            {new Date().toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            })}{' '}
+            · Welcome back, Admin
+            {adminLoading ? '' : ' · Live platform metrics'}
           </p>
         </div>
 
@@ -367,6 +292,7 @@ export default function AdminDashboardClient() {
                           <p className="text-xs font-semibold text-foreground">{alert.name}</p>
                           <p className="text-[11px] text-muted-foreground mt-0.5">
                             Low stock: {alert.stock}/{alert.threshold} units
+                            {alert.shopName ? ` · ${alert.shopName}` : ''}
                           </p>
                         </div>
                       </div>
@@ -459,66 +385,101 @@ export default function AdminDashboardClient() {
               <ExportButtons
                 onExcel={() =>
                   exportToCSV(
-                    'revenue-report.csv',
-                    ['Month', 'Revenue ($)', 'Orders'],
-                    revenueData.map((d) => [d.month, d.revenue, d.orders])
+                    chartPeriod === 'monthly' ? 'revenue-report.csv' : 'sales-report.csv',
+                    chartPeriod === 'monthly'
+                      ? ['Month', 'Revenue ($)', 'Orders']
+                      : ['Day', 'Sales ($)', 'Cancelled'],
+                    lineChartData.map((d) =>
+                      chartPeriod === 'monthly'
+                        ? [
+                            'month' in d ? d.month : '',
+                            (d as { revenue: number }).revenue,
+                            (d as { orders: number }).orders,
+                          ]
+                        : [
+                            'day' in d ? d.day : '',
+                            (d as { sales: number }).sales,
+                            (d as { returns: number }).returns,
+                          ]
+                    )
                   )
                 }
                 onPDF={() =>
                   openPDF(
                     generatePDFContent(
-                      'Revenue Report',
-                      ['Month', 'Revenue ($)', 'Orders'],
-                      revenueData.map((d) => [d.month, `$${d.revenue.toLocaleString()}`, d.orders])
+                      chartPeriod === 'monthly' ? 'Revenue Report' : 'Weekly Sales',
+                      chartPeriod === 'monthly'
+                        ? ['Month', 'Revenue ($)', 'Orders']
+                        : ['Day', 'Sales ($)', 'Cancelled'],
+                      lineChartData.map((d) =>
+                        chartPeriod === 'monthly'
+                          ? [
+                              'month' in d ? d.month : '',
+                              `$${(d as { revenue: number }).revenue.toLocaleString()}`,
+                              (d as { orders: number }).orders,
+                            ]
+                          : [
+                              'day' in d ? d.day : '',
+                              `$${(d as { sales: number }).sales.toLocaleString()}`,
+                              (d as { returns: number }).returns,
+                            ]
+                      )
                     )
                   )
                 }
               />
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart
-              data={chartPeriod === 'monthly' ? revenueData : salesTrendData}
-              margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(43,43,43,0.06)" />
-              <XAxis
-                dataKey={chartPeriod === 'monthly' ? 'month' : 'day'}
-                tick={{ fontSize: 11, fill: '#8A7A74' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: '#8A7A74' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) =>
-                  chartPeriod === 'monthly' ? `$${(v / 1000).toFixed(0)}k` : `$${v}`
-                }
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11, color: '#8A7A74' }} />
-              <Line
-                type="monotone"
-                dataKey="revenue"
-                stroke="#E8B4B8"
-                strokeWidth={2.5}
-                dot={{ fill: '#E8B4B8', strokeWidth: 0, r: 4 }}
-                activeDot={{ r: 6, fill: '#C4848A' }}
-                name="Revenue"
-              />
-              <Line
-                type="monotone"
-                dataKey="orders"
-                stroke="#D4A373"
-                strokeWidth={2}
-                dot={{ fill: '#D4A373', strokeWidth: 0, r: 3 }}
-                activeDot={{ r: 5, fill: '#B8854A' }}
-                name="Orders"
-                strokeDasharray="4 2"
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {adminLoading ? (
+            <div className="h-[240px] flex items-center justify-center text-sm text-muted-foreground">
+              Loading chart…
+            </div>
+          ) : lineChartData.length === 0 ? (
+            <div className="h-[240px] flex items-center justify-center text-sm text-muted-foreground">
+              No chart data yet.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={lineChartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(43,43,43,0.06)" />
+                <XAxis
+                  dataKey={lineXKey}
+                  tick={{ fontSize: 11, fill: '#8A7A74' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: '#8A7A74' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) =>
+                    chartPeriod === 'monthly' ? `$${(v / 1000).toFixed(0)}k` : `$${v}`
+                  }
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11, color: '#8A7A74' }} />
+                <Line
+                  type="monotone"
+                  dataKey={linePrimaryKey}
+                  stroke="#E8B4B8"
+                  strokeWidth={2.5}
+                  dot={{ fill: '#E8B4B8', strokeWidth: 0, r: 4 }}
+                  activeDot={{ r: 6, fill: '#C4848A' }}
+                  name={chartPeriod === 'monthly' ? 'Revenue' : 'Sales'}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={lineSecondaryKey}
+                  stroke="#D4A373"
+                  strokeWidth={2}
+                  dot={{ fill: '#D4A373', strokeWidth: 0, r: 3 }}
+                  activeDot={{ r: 5, fill: '#B8854A' }}
+                  name={chartPeriod === 'monthly' ? 'Orders' : 'Cancelled'}
+                  strokeDasharray="4 2"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         {/* Sales Category Pie — 1 col */}
@@ -527,41 +488,53 @@ export default function AdminDashboardClient() {
             <h2 className="text-base font-bold text-foreground">Sales by Category</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Revenue distribution this month</p>
           </div>
-          <ResponsiveContainer width="100%" height={180}>
-            <PieChart>
-              <Pie
-                data={categoryData}
-                cx="50%"
-                cy="50%"
-                innerRadius={52}
-                outerRadius={78}
-                paddingAngle={3}
-                dataKey="value"
-              >
-                {categoryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} stroke="transparent" />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value: number) => [`${value}%`, 'Share']}
-                contentStyle={{ fontSize: 12, borderRadius: 12 }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="flex flex-col gap-2 mt-3">
-            {categoryData.map((cat) => (
-              <div key={cat.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ background: cat.color }}
+          {categoryChartData.length === 0 ? (
+            <div className="h-[180px] flex items-center justify-center text-sm text-muted-foreground">
+              No category data yet.
+            </div>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie
+                    data={categoryChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={52}
+                    outerRadius={78}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {categoryChartData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.color ?? '#E8B4B8'}
+                        stroke="transparent"
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number) => [value, 'Units sold']}
+                    contentStyle={{ fontSize: 12, borderRadius: 12 }}
                   />
-                  <span className="text-xs text-muted-foreground">{cat.name}</span>
-                </div>
-                <span className="text-xs font-bold text-foreground">{cat.value}%</span>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex flex-col gap-2 mt-3">
+                {categoryChartData.map((cat) => (
+                  <div key={cat.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ background: cat.color ?? '#E8B4B8' }}
+                      />
+                      <span className="text-xs text-muted-foreground">{cat.name}</span>
+                    </div>
+                    <span className="text-xs font-bold text-foreground">{cat.value} sold</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -577,7 +550,7 @@ export default function AdminDashboardClient() {
               exportToCSV(
                 'sales-trends.csv',
                 ['Day', 'Sales ($)', 'Returns ($)'],
-                salesTrendData.map((d) => [d.day, d.sales, d.returns])
+                salesChartData.map((d) => [d.day, d.sales, d.returns])
               )
             }
             onPDF={() =>
@@ -585,7 +558,7 @@ export default function AdminDashboardClient() {
                 generatePDFContent(
                   'Sales Trends Report',
                   ['Day', 'Sales ($)', 'Returns ($)'],
-                  salesTrendData.map((d) => [
+                  salesChartData.map((d) => [
                     d.day,
                     `$${d.sales.toLocaleString()}`,
                     `$${d.returns.toLocaleString()}`,
@@ -595,31 +568,37 @@ export default function AdminDashboardClient() {
             }
           />
         </div>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart
-            data={salesTrendData}
-            margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
-            barSize={28}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(43,43,43,0.06)" vertical={false} />
-            <XAxis
-              dataKey="day"
-              tick={{ fontSize: 11, fill: '#8A7A74' }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: '#8A7A74' }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v) => `$${v}`}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11, color: '#8A7A74' }} />
-            <Bar dataKey="sales" fill="#E8B4B8" radius={[6, 6, 0, 0]} name="Sales" />
-            <Bar dataKey="returns" fill="#F0E6DF" radius={[6, 6, 0, 0]} name="Returns" />
-          </BarChart>
-        </ResponsiveContainer>
+        {salesChartData.length === 0 ? (
+          <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">
+            No weekly sales data yet.
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart
+              data={salesChartData}
+              margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
+              barSize={28}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(43,43,43,0.06)" vertical={false} />
+              <XAxis
+                dataKey="day"
+                tick={{ fontSize: 11, fill: '#8A7A74' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#8A7A74' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${v}`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, color: '#8A7A74' }} />
+              <Bar dataKey="sales" fill="#E8B4B8" radius={[6, 6, 0, 0]} name="Sales" />
+              <Bar dataKey="returns" fill="#F0E6DF" radius={[6, 6, 0, 0]} name="Cancelled" />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       {/* ── Bottom Grid ──────────────────────────────────────────────────────── */}
@@ -677,50 +656,74 @@ export default function AdminDashboardClient() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentOrders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="border-b border-border/50 hover:bg-secondary/40 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <span className="text-xs font-bold text-foreground font-mono">
-                          {order.id}
-                        </span>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{order.date}</p>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full overflow-hidden border border-border shrink-0">
-                            <AppImage
-                              src={order.avatar}
-                              alt={order.avatarAlt}
-                              width={28}
-                              height={28}
-                              className="object-cover w-full h-full"
-                            />
-                          </div>
-                          <span className="text-xs font-semibold text-foreground whitespace-nowrap">
-                            {order.customer}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 hidden sm:table-cell">
-                        <span className="text-xs text-muted-foreground">{order.product}</span>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <span className="text-sm font-bold text-foreground">
-                          ${order.amount.toFixed(2)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <span
-                          className={`inline-flex px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${statusConfig[order.status]}`}
-                        >
-                          {order.status}
-                        </span>
+                  {adminLoading ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-6 py-12 text-center text-sm text-muted-foreground"
+                      >
+                        Loading recent orders…
                       </td>
                     </tr>
-                  ))}
+                  ) : displayRecentOrders.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-6 py-12 text-center text-sm text-muted-foreground"
+                      >
+                        No orders yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    displayRecentOrders.map((order) => (
+                      <tr
+                        key={order.id}
+                        className="border-b border-border/50 hover:bg-secondary/40 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-bold text-foreground font-mono">
+                            {order.id}
+                          </span>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{order.date}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full overflow-hidden border border-border shrink-0 bg-secondary flex items-center justify-center">
+                              {order.avatar ? (
+                                <AppImage
+                                  src={order.avatar}
+                                  alt={order.avatarAlt}
+                                  width={28}
+                                  height={28}
+                                  className="object-cover w-full h-full"
+                                />
+                              ) : (
+                                <Icon name="UserIcon" size={14} className="text-muted-foreground" />
+                              )}
+                            </div>
+                            <span className="text-xs font-semibold text-foreground whitespace-nowrap">
+                              {order.customer}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 hidden sm:table-cell">
+                          <span className="text-xs text-muted-foreground">{order.product}</span>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <span className="text-sm font-bold text-foreground">
+                            ${order.amount.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span
+                            className={`inline-flex px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide ${statusConfig[order.status] ?? 'badge-info'}`}
+                          >
+                            {order.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -831,32 +834,38 @@ export default function AdminDashboardClient() {
               />
             </div>
             <div className="flex flex-col gap-4">
-              {topProducts.map((product, i) => (
-                <div key={product.name} className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-5 h-5 rounded-lg bg-secondary flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0">
-                        {i + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-foreground truncate">
-                          {product.name}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">{product.sold} sold</p>
+              {topProducts.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  No product sales yet.
+                </p>
+              ) : (
+                topProducts.map((product, i) => (
+                  <div key={product.name} className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded-lg bg-secondary flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0">
+                          {i + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-foreground truncate">
+                            {product.name}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">{product.sold} sold</p>
+                        </div>
                       </div>
+                      <span className="text-xs font-bold text-foreground shrink-0 ml-2">
+                        ${product.revenue.toLocaleString()}
+                      </span>
                     </div>
-                    <span className="text-xs font-bold text-foreground shrink-0 ml-2">
-                      ${product.revenue.toLocaleString()}
-                    </span>
+                    <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-700"
+                        style={{ width: `${product.progress}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full transition-all duration-700"
-                      style={{ width: `${product.progress}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 

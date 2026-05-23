@@ -1,6 +1,7 @@
-import React from 'react';
+'use client';
+
 import CheckoutClient from '@/app/checkout/components/CheckoutClient';
 
 export default function CustomerCheckoutPage() {
-  return <CheckoutClient />;
+  return <CheckoutClient embedded />;
 }

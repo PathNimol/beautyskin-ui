@@ -2,14 +2,15 @@
 // src/app/customers/CustomersClient.tsx
 // Fixed imports: @/types/userManagement, @/components/UserFormModal, etc.
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Icon from '@/components/ui/AppIcon';
 import {
-  MOCK_CUSTOMERS,
   STATUS_STYLES,
   type ManagedUser,
   type UserStatus,
 } from '@/types/userManagement';
+import { customersApi } from '@/lib/api';
+import { mapAccountStatusFromApi, mapAccountStatusToApi } from '@/lib/api/mappers';
 import UserFormModal from '@/components/UserFormModel';
 import ActivityDrawer from '@/components/ActivityDrawer';
 import ConfirmModal from '@/components/ConfirmModel';
@@ -59,7 +60,7 @@ function ResetPasswordModal({
 }: {
   user: ManagedUser;
   onClose: () => void;
-  onDone: () => void;
+  onDone: (newPassword: string, confirmPassword: string) => Promise<void>;
 }) {
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
@@ -67,7 +68,7 @@ function ResetPasswordModal({
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handle = () => {
+  const handle = async () => {
     if (newPw.length < 6) {
       setError('Min 6 characters');
       return;
@@ -78,10 +79,14 @@ function ResetPasswordModal({
     }
     setError('');
     setLoading(true);
-    setTimeout(() => {
+    try {
+      await onDone(newPw, confirmPw);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Reset failed');
+    } finally {
       setLoading(false);
-      onDone();
-    }, 700);
+    }
   };
 
   return (
@@ -149,8 +154,62 @@ function ResetPasswordModal({
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
+function mapApiCustomer(u: {
+  id: string;
+  email: string;
+  fullName?: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: string;
+  phone?: string;
+  joinDate?: string;
+  status?: string;
+}): ManagedUser {
+  const first = u.firstName || (u.fullName || u.name || '').split(' ')[0] || '';
+  const last = u.lastName || (u.fullName || u.name || '').split(' ').slice(1).join(' ') || '';
+  const joined =
+    typeof u.joinDate === 'string'
+      ? new Date(u.joinDate).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : new Date().toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        });
+  return {
+    id: u.id,
+    firstName: first,
+    lastName: last,
+    email: u.email,
+    phone: u.phone || '',
+    role: 'Customer',
+    status: mapAccountStatusFromApi(u.status),
+    joinedAt: joined,
+    lastActive: '—',
+    activityLog: [],
+  };
+}
+
 export default function CustomersClient() {
-  const [users, setUsers] = useState<ManagedUser[]>(MOCK_CUSTOMERS);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+
+  const loadCustomers = React.useCallback(() => {
+    setListLoading(true);
+    customersApi
+      .listCustomers({ limit: 200 })
+      .then((page) => setUsers((page.content || []).map(mapApiCustomer)))
+      .catch(() => setUsers([]))
+      .finally(() => setListLoading(false));
+  }, []);
+
+  useEffect(() => {
+    loadCustomers();
+  }, [loadCustomers]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
 
@@ -188,77 +247,96 @@ export default function CustomersClient() {
     [users]
   );
 
-  const handleSave = (data: Partial<ManagedUser>) => {
-    if (formMode === 'create') {
-      const newUser: ManagedUser = {
-        id: `c${Date.now()}`,
-        firstName: data.firstName ?? '',
-        lastName: data.lastName ?? '',
-        email: data.email ?? '',
-        phone: data.phone,
-        role: 'Customer',
-        status: data.status ?? 'active',
-        joinedAt: new Date().toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        }),
-        lastActive: '—',
-        activityLog: [
-          { action: 'Account created by admin', timestamp: new Date().toLocaleString() },
-        ],
-      };
-      setUsers((prev) => [newUser, ...prev]);
-      showToast(`${newUser.firstName} ${newUser.lastName} created successfully.`);
-    } else if (editTarget) {
+  const handleSave = async (data: Partial<ManagedUser>) => {
+    try {
+      if (formMode === 'create') {
+        if (!data.password || !data.confirmPassword) {
+          showToast('Password is required for new customers.', 'error');
+          return;
+        }
+        const created = await customersApi.createCustomer({
+          firstName: data.firstName ?? '',
+          lastName: data.lastName ?? '',
+          email: data.email ?? '',
+          phone: data.phone,
+          password: data.password,
+          confirmPassword: data.confirmPassword,
+        });
+        setUsers((prev) => [...prev, mapApiCustomer(created)]);
+        showToast(`${data.firstName} ${data.lastName} created.`);
+      } else if (editTarget) {
+        const updated = await customersApi.updateCustomer(editTarget.id, {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          phone: data.phone,
+        });
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === editTarget.id
+              ? {
+                  ...mapApiCustomer(updated),
+                  activityLog: [
+                    { action: 'Profile updated by admin', timestamp: new Date().toLocaleString() },
+                    ...(u.activityLog || []),
+                  ],
+                }
+              : u
+          )
+        );
+        showToast('Customer updated successfully.');
+      }
+      setFormMode(null);
+      setEditTarget(null);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Save failed', 'error');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await customersApi.deleteCustomer(deleteTarget.id);
+      setUsers((prev) => prev.filter((u: ManagedUser) => u.id !== deleteTarget.id));
+      showToast(`${deleteTarget.firstName} ${deleteTarget.lastName} deleted.`);
+      setDeleteTarget(null);
+      if (activityUser?.id === deleteTarget.id) setActivityUser(null);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Delete failed', 'error');
+    }
+  };
+
+  const toggleStatus = async (userId: string, status: UserStatus) => {
+    try {
+      const updated = await customersApi.updateCustomerStatus(userId, mapAccountStatusToApi(status));
       setUsers((prev) =>
         prev.map((u: ManagedUser) =>
-          u.id === editTarget.id
+          u.id === userId
             ? {
-                ...u,
-                ...data,
+                ...mapApiCustomer(updated),
                 activityLog: [
-                  { action: 'Profile updated by admin', timestamp: new Date().toLocaleString() },
-                  ...u.activityLog,
+                  {
+                    action: `Status changed to ${status}`,
+                    timestamp: new Date().toLocaleString(),
+                  },
+                  ...(u.activityLog || []),
                 ],
               }
             : u
         )
       );
-      showToast('User updated successfully.');
+      showToast(`Status updated to ${status}.`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to update status', 'error');
     }
-    setFormMode(null);
-    setEditTarget(null);
   };
 
-  const handleDelete = () => {
-    if (!deleteTarget) return;
-    setUsers((prev) => prev.filter((u: ManagedUser) => u.id !== deleteTarget.id));
-    showToast(`${deleteTarget.firstName} ${deleteTarget.lastName} deleted.`);
-    setDeleteTarget(null);
-    if (activityUser?.id === deleteTarget.id) setActivityUser(null);
-  };
-
-  const toggleStatus = (userId: string, status: UserStatus) => {
-    setUsers((prev) =>
-      prev.map((u: ManagedUser) =>
-        u.id === userId
-          ? {
-              ...u,
-              status,
-              activityLog: [
-                { action: `Status changed to ${status}`, timestamp: new Date().toLocaleString() },
-                ...u.activityLog,
-              ],
-            }
-          : u
-      )
-    );
-    showToast(`Status updated to ${status}.`);
-  };
-
-  const handleResetDone = () => {
+  const handleResetDone = async (newPassword: string, confirmPassword: string) => {
     if (!resetTarget) return;
+    await customersApi.resetCustomerPassword(resetTarget.id, {
+      newPassword,
+      confirmPassword,
+    });
     setUsers((prev) =>
       prev.map((u: ManagedUser) =>
         u.id === resetTarget.id
@@ -403,7 +481,13 @@ export default function CustomersClient() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {listLoading ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-16 text-sm text-muted-foreground">
+                    Loading customers…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-16 text-sm text-muted-foreground">
                     <Icon name="UsersIcon" size={32} className="mx-auto text-border mb-3" />

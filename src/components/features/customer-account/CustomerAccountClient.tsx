@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 
@@ -34,15 +33,13 @@ export default function CustomerAccountClient() {
   };
 
   return (
-    <DashboardLayout title="My Account" subtitle="Profile and shipping details for faster checkout">
-      <MotionAccountGrid
-        user={user}
-        form={form}
-        setForm={setForm}
-        saved={saved}
-        handleSave={handleSave}
-      />
-    </DashboardLayout>
+    <MotionAccountGrid
+      user={user}
+      form={form}
+      setForm={setForm}
+      saved={saved}
+      handleSave={handleSave}
+    />
   );
 }
 

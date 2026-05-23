@@ -4,17 +4,20 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useMockAuth } from '@/contexts/MockAuthContext';
+import { useRealtimeNotifications } from '@/hooks/useRealtimeData';
+import { useEffect, useRef } from 'react';
 
 const navItems = [
   { label: 'Dashboard', icon: 'Squares2X2Icon', href: '/admin/dashboard' },
-  { label: 'Products', icon: 'ArchiveBoxIcon', href: '/admin/products' },
-  { label: 'Orders', icon: 'ClipboardDocumentListIcon', href: '/admin/orders' },
   { label: 'Shops', icon: 'BuildingStorefrontIcon', href: '/admin/shops' },
   { label: 'Customers', icon: 'UsersIcon', href: '/admin/customers' },
+  { label: 'Orders', icon: 'ClipboardDocumentListIcon', href: '/admin/orders' },
+  { label: 'Products', icon: 'ArchiveBoxIcon', href: '/admin/products' },
+  { label: 'Inventory', icon: 'CubeIcon', href: '/admin/inventory' },
   { label: 'Analytics', icon: 'ChartBarIcon', href: '/admin/analytics' },
-  { label: 'Promotions', icon: 'TagIcon', href: '/admin/promotions' },
-  { label: 'Suppliers', icon: 'TruckIcon', href: '/admin/suppliers' },
+  { label: 'Reports', icon: 'DocumentChartBarIcon', href: '/admin/reports' },
   { label: 'Settings', icon: 'Cog6ToothIcon', href: '/settings' },
 ];
 
@@ -24,8 +27,29 @@ export default function AdminSidebar() {
   const { signOut } = useMockAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
 
-  const handleSignOut = async () => {
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useRealtimeNotifications();
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleSignOutClick = () => {
+    setMobileOpen(false);
+    setSignOutOpen(true);
+  };
+
+  const handleConfirmSignOut = async () => {
+    setSignOutOpen(false);
     await signOut();
     router.push('/login');
   };
@@ -54,6 +78,8 @@ export default function AdminSidebar() {
             <Link
               key={item.label}
               href={item.href}
+              prefetch
+              scroll={false}
               onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all min-h-[44px] group ${
                 isActive
@@ -86,7 +112,7 @@ export default function AdminSidebar() {
           {!collapsed && <span>View Store</span>}
         </Link>
         <button
-          onClick={handleSignOut}
+          onClick={handleSignOutClick}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-all min-h-[44px]"
         >
           <Icon name="ArrowRightOnRectangleIcon" size={18} />
@@ -142,6 +168,19 @@ export default function AdminSidebar() {
           </aside>
         </div>
       )}
+
+      {/* Sign Out Confirmation Dialog */}
+      <ConfirmDialog
+        open={signOutOpen}
+        title="Sign Out"
+        description="Are you sure you want to sign out? You'll need to sign in again to access your account."
+        confirmLabel="Sign Out"
+        cancelLabel="Cancel"
+        variant="danger"
+        icon="ArrowRightOnRectangleIcon"
+        onConfirm={handleConfirmSignOut}
+        onCancel={() => setSignOutOpen(false)}
+      />
     </>
   );
 }

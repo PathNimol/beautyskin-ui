@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
+import { beautyHero } from '@/lib/media/beautyImages';
 
 const heroStats = [
 { value: '3.2K+', label: 'Happy Customers' },
@@ -24,7 +25,7 @@ export default function HeroSection() {
       {/* Cinematic background image */}
       <div className="absolute inset-0 z-0">
         <AppImage
-          src="https://images.unsplash.com/photo-1702312685548-3832748d09d6"
+          src={beautyHero.flatLay}
           alt="Flat lay of premium skincare products on cream marble surface with soft natural lighting and botanical accents"
           fill
           priority

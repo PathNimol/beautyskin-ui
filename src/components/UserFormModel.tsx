@@ -73,6 +73,9 @@ export default function UserFormModal({
         status: form.status as UserStatus,
         shopId: form.shopId || undefined,
         shopName: shops.find((s) => s.id === form.shopId)?.name,
+        ...(mode === 'create'
+          ? { password: form.password, confirmPassword: form.confirmPw }
+          : {}),
       });
     }, 600);
   };

@@ -24,6 +24,9 @@ export interface ManagedUser {
   lastActive: string;
   avatar?: string;
   phone?: string;
+  /** Set only when creating accounts via admin forms */
+  password?: string;
+  confirmPassword?: string;
   activityLog: ActivityLog[];
 }
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
+import { authApi } from '@/lib/api';
 
 const VALID_EMAILS = [
   'admin@beautyskin.com',
@@ -43,7 +44,7 @@ export default function ForgotPasswordPage() {
   const strength = passwordStrength(newPassword);
 
   // Step 1: Send reset link
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!email.includes('@')) {
@@ -51,10 +52,14 @@ export default function ForgotPasswordPage() {
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await authApi.forgotPassword(email.trim());
       setStep('otp');
-    }, 900);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send reset code');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Step 2: OTP entry
@@ -90,7 +95,7 @@ export default function ForgotPasswordPage() {
   };
 
   // Step 3: New password
-  const handleResetSubmit = (e: React.FormEvent) => {
+  const handleResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (newPassword.length < 6) {
@@ -101,11 +106,20 @@ export default function ForgotPasswordPage() {
       setError('Passwords do not match.');
       return;
     }
+    const code = otp.join('');
+    if (code.length < 6) {
+      setError('Please enter the verification code.');
+      return;
+    }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await authApi.resetPassword(email.trim(), code, newPassword);
       setStep('done');
-    }, 800);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reset password');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

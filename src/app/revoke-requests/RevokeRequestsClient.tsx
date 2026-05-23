@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
-import { createClient } from '@/lib/supabase/client';
-import { MOCK_PRODUCTS } from '@/lib/mock/data';
+import { revokeRequestsApi, productsApi } from '@/lib/api';
+import type { ApiProduct } from '@/lib/api/types';
 
 interface RevokeRequest {
   id: string;
@@ -35,10 +34,10 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function RevokeRequestsClient() {
-  const { user, role } = useMockAuth();
-  const supabase = createClient();
+  const { user, role, shopId } = useMockAuth();
 
   const [requests, setRequests] = useState<RevokeRequest[]>([]);
+  const [merchantProducts, setMerchantProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -52,25 +51,43 @@ export default function RevokeRequestsClient() {
     product_name: '',
     sku: '',
     quantity: 1,
-    reason: 'expired\' as \'expired\' | \'broken\' | \'tester\' | \'other',
+    reason: 'expired' as 'expired' | 'broken' | 'tester' | 'other',
     reason_detail: '',
   });
 
   const fetchRequests = useCallback(async () => {
+    if (!shopId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('product_revoke_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (data) setRequests(data as RevokeRequest[]);
+      const page = await revokeRequestsApi.list(shopId);
+      setRequests(
+        (page.content || []).map((r) => ({
+          id: r.id,
+          product_name: r.productName || '',
+          sku: '',
+          quantity: r.quantity,
+          reason: (r.reason?.toLowerCase() || 'other') as RevokeRequest['reason'],
+          reason_detail: r.detail || '',
+          status: (r.status?.toLowerCase() || 'pending') as RevokeRequest['status'],
+          requester_name: '',
+          review_notes: null,
+          created_at: r.createdAt || '',
+          reviewed_at: null,
+        }))
+      );
     } catch { /* ignore */ }
     setLoading(false);
-  }, [supabase]);
+  }, [shopId]);
 
   useEffect(() => {
     fetchRequests();
-  }, [fetchRequests]);
+    if (shopId) {
+      productsApi.listMerchant(shopId, { limit: 200 }).then((p) => setMerchantProducts(p.content || [])).catch(() => {});
+    }
+  }, [fetchRequests, shopId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,20 +98,13 @@ export default function RevokeRequestsClient() {
     setSaving(true);
     setErrorMsg('');
     try {
-      const { error } = await supabase.from('product_revoke_requests').insert({
-        shop_id: null,
-        shop_name: 'GlowSkin Store',
-        requested_by: user?.id || '',
-        requester_name: user?.name || '',
-        product_id: null,
-        product_name: form.product_name,
-        sku: form.sku,
+      if (!shopId || !form.product_id) throw new Error('Shop and product required');
+      await revokeRequestsApi.create(shopId, {
+        productId: form.product_id,
         quantity: form.quantity,
-        reason: form.reason,
-        reason_detail: form.reason_detail,
-        status: 'pending',
+        reason: form.reason.toUpperCase(),
+        detail: form.reason_detail,
       });
-      if (error) throw error;
       setSuccessMsg('Revoke request submitted successfully!');
       setShowForm(false);
       setForm({ product_id: '', product_name: '', sku: '', quantity: 1, reason: 'expired', reason_detail: '' });
@@ -110,12 +120,10 @@ export default function RevokeRequestsClient() {
     if (!reviewModal.request || !reviewModal.action) return;
     setSaving(true);
     try {
-      await supabase.from('product_revoke_requests').update({
-        status: reviewModal.action,
-        reviewed_by: user?.id || '',
-        reviewed_at: new Date().toISOString(),
-        review_notes: reviewNotes,
-      }).eq('id', reviewModal.request.id);
+      await revokeRequestsApi.review(reviewModal.request.id, {
+        status: reviewModal.action.toUpperCase(),
+        notes: reviewNotes,
+      });
       setReviewModal({ open: false, request: null, action: null });
       setReviewNotes('');
       setSuccessMsg(`Request ${reviewModal.action}.`);
@@ -128,8 +136,7 @@ export default function RevokeRequestsClient() {
   const pendingCount = requests.filter(r => r.status === 'pending').length;
 
   return (
-    <DashboardLayout title="Revoke Requests" subtitle="Request removal of expired, broken, or tester products">
-      {successMsg && (
+    <>{successMsg && (
         <div className="mb-4 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
           <Icon name="CheckCircleIcon" size={18} className="text-green-600 shrink-0" />
           <p className="text-sm text-green-700 font-medium">{successMsg}</p>
@@ -189,13 +196,18 @@ export default function RevokeRequestsClient() {
                 <select
                   value={form.product_name}
                   onChange={e => {
-                    const prod = MOCK_PRODUCTS.find(p => p.name === e.target.value);
-                    setForm(prev => ({ ...prev, product_name: e.target.value, sku: prod?.sku || '' }));
+                    const prod = merchantProducts.find(p => p.name === e.target.value);
+                    setForm(prev => ({
+                      ...prev,
+                      product_name: e.target.value,
+                      product_id: prod?.id || '',
+                      sku: prod?.sku || '',
+                    }));
                   }}
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary"
                 >
                   <option value="">Select product...</option>
-                  {MOCK_PRODUCTS.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                  {merchantProducts.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                 </select>
               </div>
               <div>
@@ -329,6 +341,6 @@ export default function RevokeRequestsClient() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

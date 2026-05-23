@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import ProductsClient from '@/app/products/ProductsClient';
 

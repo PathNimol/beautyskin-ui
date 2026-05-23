@@ -20,5 +20,9 @@ export function sanitizeRedirect(path: string | null, role: UserRole | string | 
   if (!path || path === '/login' || path === '/register') {
     return getRoleHomePath(role);
   }
+  // Allow returning to the marketing home page after login
+  if (path === '/') {
+    return '/';
+  }
   return path;
 }

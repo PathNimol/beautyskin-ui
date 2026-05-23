@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
-import { createClient } from '@/lib/supabase/client';
+import { useAuthReady } from '@/hooks/useAuthReady';
+import DashboardContentSkeleton from '@/components/ui/DashboardContentSkeleton';
+import { useAnalyticsSummary } from '@/hooks/useApiLists';
 import { useRealtimeOrders, useRealtimeInventory, useRealtimeShops } from '@/hooks/useRealtimeData';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -45,37 +46,30 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
 
 export default function AnalyticsClient() {
   const { role } = useMockAuth();
-  const supabase = createClient();
+  const authReady = useAuthReady();
+  const { data: analyticsData, loading: analyticsLoading } = useAnalyticsSummary('30d');
   const { orders, loading: ordersLoading } = useRealtimeOrders();
-  const { inventory } = useRealtimeInventory();
+  const { inventory } = useRealtimeInventory(undefined, role === 'admin');
   const { shops } = useRealtimeShops();
 
   const [staffActivity, setStaffActivity] = useState<StaffActivity[]>([]);
   const [activeTab, setActiveTab] = useState<'revenue' | 'orders' | 'customers' | 'staff'>('revenue');
   const [exporting, setExporting] = useState(false);
 
-  const fetchStaffActivity = useCallback(async () => {
-    try {
-      const { data } = await supabase
-        .from('staff')
-        .select('name, role, shop_id, status, created_at')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (data) {
-        setStaffActivity(data.map(s => ({
-          name: s.name,
-          role: s.role,
-          shop: s.shop_id || 'N/A',
-          status: s.status,
-          created_at: s.created_at,
-        })));
-      }
-    } catch { /* ignore */ }
-  }, [supabase]);
-
   useEffect(() => {
-    fetchStaffActivity();
-  }, [fetchStaffActivity]);
+    const staff = analyticsData?.staffActivity;
+    if (Array.isArray(staff)) {
+      setStaffActivity(
+        staff.map((s: Record<string, unknown>) => ({
+          name: String(s.name || ''),
+          role: String(s.role || ''),
+          shop: String(s.shop || 'N/A'),
+          status: String(s.status || ''),
+          created_at: String(s.createdAt || s.created_at || ''),
+        }))
+      );
+    }
+  }, [analyticsData]);
 
   const totalRevenue = orders.filter(o => o.pay_status === 'Paid').reduce((s, o) => s + Number(o.total), 0);
   const totalOrders = orders.length;
@@ -156,20 +150,21 @@ export default function AnalyticsClient() {
     { id: 'staff' as const, label: 'Staff Activity', icon: 'UserGroupIcon' },
   ];
 
+  if (!authReady) {
+    return <DashboardContentSkeleton />;
+  }
+
   if (role !== 'admin' && role !== 'owner') {
     return (
-      <DashboardLayout title="Analytics" subtitle="Platform analytics and insights">
-        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-          <Icon name="LockClosedIcon" size={40} className="opacity-20 mb-3" />
-          <p className="text-sm font-medium">Access restricted to admins and owners</p>
-        </div>
-      </DashboardLayout>
+      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+        <Icon name="LockClosedIcon" size={40} className="opacity-20 mb-3" />
+        <p className="text-sm font-medium">Access restricted to admins and owners</p>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout title="Analytics" subtitle="Real-time platform analytics and insights">
-      <div className="flex items-center justify-between mb-6">
+    <><div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           <span className="text-xs text-muted-foreground font-medium">Live Data</span>
@@ -369,6 +364,6 @@ export default function AnalyticsClient() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,40 +1,25 @@
 'use client';
-// Canonical shop admin UI — imported by /admin/shops, /admin-shops, owner/staff, and ShopsClient.
 
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import StaffManagementModal from '@/components/StaffManagementModal';
+import AddShopModal from './AddShopModal';
 import { useRealtimeShops } from '@/hooks/useRealtimeData';
-import { createClient } from '@/lib/supabase/client';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-type ShopStatus = 'active' | 'pending' | 'suspended';
-
-const STATUS_COLORS: Record<ShopStatus, string> = {
-  active: 'bg-green-50 text-green-700',
-  pending: 'bg-amber-50 text-amber-700',
-  suspended: 'bg-red-50 text-red-700',
-};
-
-const STATUS_LABELS: Record<ShopStatus, string> = {
-  active: 'Active',
-  pending: 'Pending',
-  suspended: 'Suspended',
-};
+import { shopsApi } from '@/lib/api';
+import { STATUS_COLORS, STATUS_LABELS, type ShopStatus, type NewShopForm } from './shop-types';
+import { useMockAuth } from '@/contexts/MockAuthContext';
 
 export default function ShopManagementClient() {
   const { shops, loading, refetch } = useRealtimeShops();
+  const { role } = useMockAuth();
+  const isAdmin = role === 'admin';
+
+  console.log('role:', role, 'isAdmin:', isAdmin);
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const [showAddShop, setShowAddShop] = useState(false);
   const [filterStatus, setFilterStatus] = useState<ShopStatus | 'all'>('all');
-  const [newShop, setNewShop] = useState({
-    name: '',
-    owner_name: '',
-    description: '',
-    category: '',
-  });
   const [addingShop, setAddingShop] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [showStaffModal, setShowStaffModal] = useState(false);
@@ -54,44 +39,48 @@ export default function ShopManagementClient() {
     revenue: shops.reduce((sum, s) => sum + Number(s.revenue), 0),
   };
 
-  const handleAddShop = async () => {
-    if (!newShop.name || !newShop.owner_name) return;
+  const handleAddShop = async (form: NewShopForm) => {
     setAddingShop(true);
-    const supabase = createClient();
-    const slug = newShop.name
+    const slug = form.name
       .toLowerCase()
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '');
-    const { error } = await supabase.from('shops').insert({
-      name: newShop.name,
-      slug: `${slug}-${Date.now()}`,
-      owner_name: newShop.owner_name,
-      description: newShop.description,
-      category: newShop.category,
-      shop_status: 'pending',
-      plan: 'starter',
-      logo: 'https://img.rocket.new/generatedImages/rocket_gen_img_1c6599022-1772541113609.png',
-      logo_alt: `${newShop.name} shop logo`,
-    });
-    setAddingShop(false);
-    if (error) {
-      showToast('Failed to register shop: ' + error.message);
-      return;
+    try {
+      await shopsApi.createShop({
+        name: form.name,
+        slug: `${slug}-${Date.now()}`,
+        ownerName: form.owner_name,
+        description: form.description,
+        category: form.category,
+        logo: form.logo || undefined,
+        status: 'PENDING',
+        plan: 'STARTER',
+      });
+      showToast(`${form.name} registered successfully.`);
+      setShowAddShop(false);
+      refetch();
+    } catch (e) {
+      showToast('Failed to register shop: ' + (e instanceof Error ? e.message : 'Error'));
+    } finally {
+      setAddingShop(false);
     }
-    showToast(`${newShop.name} registered successfully.`);
-    setNewShop({ name: '', owner_name: '', description: '', category: '' });
-    setShowAddShop(false);
-    refetch();
   };
 
   const updateShopStatus = async (shopId: string, status: ShopStatus) => {
-    const supabase = createClient();
-    await supabase.from('shops').update({ shop_status: status }).eq('id', shopId);
-    refetch();
+    try {
+      await shopsApi.updateShopStatus(shopId, status.toUpperCase());
+      const shop = shops.find((s) => s.id === shopId);
+      const label =
+        status === 'active' ? 'approved' : status === 'suspended' ? 'rejected' : `set to ${status}`;
+      showToast(`"${shop?.name}" has been ${label}.`);
+      refetch();
+    } catch (e) {
+      showToast('Failed to update status: ' + (e instanceof Error ? e.message : 'Error'));
+    }
   };
 
   return (
-    <div className="p-6 md:p-8 min-h-screen bg-admin-bg">
+    <div className="p-6 md:p-8 min-h-screen bg-admin-bg rounded-2xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-8 pl-10 md:pl-0">
         <div>
@@ -159,6 +148,62 @@ export default function ShopManagementClient() {
         ))}
       </div>
 
+      {/* Pending Approvals Banner — admin only */}
+      {isAdmin && shops.filter((s) => s.shop_status === 'pending').length > 0 && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-amber-200 flex items-center gap-2">
+            <Icon name="ClockIcon" size={16} className="text-amber-600 shrink-0" />
+            <p className="text-sm font-bold text-amber-700">
+              Pending Approvals ({shops.filter((s) => s.shop_status === 'pending').length})
+            </p>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {shops
+              .filter((s) => s.shop_status === 'pending')
+              .map((shop) => (
+                <div key={shop.id} className="flex items-center gap-3 px-5 py-3 flex-wrap">
+                  <div className="w-8 h-8 rounded-xl overflow-hidden bg-amber-100 shrink-0 flex items-center justify-center">
+                    {shop.logo ? (
+                      <AppImage
+                        src={shop.logo}
+                        alt={shop.name}
+                        width={32}
+                        height={32}
+                        className="object-cover w-full h-full"
+                      />
+                    ) : (
+                      <Icon name="BuildingStorefrontIcon" size={14} className="text-amber-600" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-foreground truncate">{shop.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      Owner: {shop.owner_name}
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground shrink-0">
+                    {new Date(shop.created_at).toLocaleDateString()}
+                  </p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => updateShopStatus(shop.id, 'active')}
+                      className="px-3 py-1.5 bg-green-100 text-green-700 text-xs font-bold rounded-lg hover:bg-green-200 transition-all"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => updateShopStatus(shop.id, 'suspended')}
+                      className="px-3 py-1.5 bg-red-100 text-red-700 text-xs font-bold rounded-lg hover:bg-red-200 transition-all"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Shops List */}
         <div className="xl:col-span-1">
@@ -178,55 +223,42 @@ export default function ShopManagementClient() {
             </div>
             <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
               {loading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
+                <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
               ) : filteredShops.length === 0 ? (
-                <div className="py-12 text-center">
-                  <Icon
-                    name="BuildingStorefrontIcon"
-                    size={32}
-                    className="text-border mx-auto mb-2"
-                  />
-                  <p className="text-sm text-muted-foreground">No shops found</p>
+                <div className="py-12 text-center text-sm text-muted-foreground">
+                  No shops found
                 </div>
               ) : (
                 filteredShops.map((shop) => (
                   <button
                     key={shop.id}
                     onClick={() => setSelectedShopId(shop.id)}
-                    className={`w-full text-left px-5 py-4 hover:bg-secondary/40 transition-all ${selectedShopId === shop.id ? 'bg-primary/5 border-l-2 border-primary' : ''}`}
+                    className={`w-full flex items-center gap-3 px-5 py-4 hover:bg-secondary transition-all text-left ${
+                      selectedShopId === shop.id ? 'bg-primary/5 border-l-2 border-primary' : ''
+                    }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-secondary shrink-0">
+                    <div className="w-9 h-9 rounded-xl overflow-hidden bg-primary/10 shrink-0 flex items-center justify-center">
+                      {shop.logo ? (
                         <AppImage
                           src={shop.logo}
-                          alt={shop.logo_alt}
-                          width={40}
-                          height={40}
+                          alt={shop.name}
+                          width={36}
+                          height={36}
                           className="object-cover w-full h-full"
                         />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-bold text-foreground truncate">{shop.name}</p>
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-lg shrink-0 ${STATUS_COLORS[shop.shop_status]}`}
-                          >
-                            {STATUS_LABELS[shop.shop_status]}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{shop.owner_name}</p>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-[10px] text-muted-foreground">
-                            {shop.orders_count} orders
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            ${Number(shop.revenue).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
+                      ) : (
+                        <Icon name="BuildingStorefrontIcon" size={16} className="text-rose-deep" />
+                      )}
                     </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-foreground truncate">{shop.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{shop.owner_name}</p>
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${STATUS_COLORS[shop.shop_status]}`}
+                    >
+                      {STATUS_LABELS[shop.shop_status]}
+                    </span>
                   </button>
                 ))
               )}
@@ -234,41 +266,44 @@ export default function ShopManagementClient() {
           </div>
         </div>
 
-        {/* Shop Detail Panel */}
+        {/* Shop Detail */}
         <div className="xl:col-span-2">
           {selectedShop ? (
             <div className="bg-card border border-border rounded-2xl shadow-card overflow-hidden">
-              {/* Shop header */}
-              <div className="px-6 py-5 border-b border-border">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl overflow-hidden bg-secondary shrink-0">
+              <div className="px-6 py-5 border-b border-border flex items-start justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl overflow-hidden bg-primary/10 shrink-0 flex items-center justify-center">
+                    {selectedShop.logo ? (
                       <AppImage
                         src={selectedShop.logo}
-                        alt={selectedShop.logo_alt}
+                        alt={selectedShop.name}
                         width={56}
                         height={56}
                         className="object-cover w-full h-full"
                       />
-                    </div>
-                    <div>
-                      <h2 className="font-bold text-foreground text-lg">{selectedShop.name}</h2>
-                      <p className="text-xs text-muted-foreground">{selectedShop.category}</p>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${STATUS_COLORS[selectedShop.shop_status]}`}
-                        >
-                          {STATUS_LABELS[selectedShop.shop_status]}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {selectedShop.owner_name}
-                        </span>
-                      </div>
+                    ) : (
+                      <Icon name="BuildingStorefrontIcon" size={24} className="text-rose-deep" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-foreground text-lg leading-tight">
+                      {selectedShop.name}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLORS[selectedShop.shop_status]}`}
+                      >
+                        {STATUS_LABELS[selectedShop.shop_status]}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {selectedShop.owner_name}
+                      </span>
                     </div>
                   </div>
-                  {/* Status controls */}
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    {(['active', 'pending', 'suspended'] as ShopStatus[]).map((s) => (
+                </div>
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  {isAdmin ? (
+                    (['active', 'pending', 'suspended'] as ShopStatus[]).map((s) => (
                       <button
                         key={s}
                         onClick={() => updateShopStatus(selectedShop.id, s)}
@@ -280,36 +315,43 @@ export default function ShopManagementClient() {
                       >
                         {STATUS_LABELS[s]}
                       </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3 mt-4">
-                  {[
-                    {
-                      label: 'Revenue',
-                      value: `$${Number(selectedShop.revenue).toLocaleString()}`,
-                    },
-                    { label: 'Orders', value: selectedShop.orders_count },
-                    { label: 'Products', value: selectedShop.products_count },
-                  ].map((stat) => (
-                    <div key={stat.label} className="bg-secondary/40 rounded-xl p-3 text-center">
-                      <p className="text-base font-extrabold text-foreground">{stat.value}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{stat.label}</p>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <span
+                      className={`text-xs font-bold px-3 py-1 rounded-full ${STATUS_COLORS[selectedShop.shop_status]}`}
+                    >
+                      {selectedShop.shop_status === 'pending'
+                        ? '⏳ Awaiting Approval'
+                        : STATUS_LABELS[selectedShop.shop_status]}
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Catalog + staff + full user management */}
-              <div className="px-6 py-8 flex flex-col items-center justify-center gap-4 text-center border-t border-border/60">
+              <div className="grid grid-cols-3 gap-3 px-6 mt-4">
+                {[
+                  { label: 'Revenue', value: `$${Number(selectedShop.revenue).toLocaleString()}` },
+                  { label: 'Orders', value: selectedShop.orders_count },
+                  { label: 'Products', value: selectedShop.products_count },
+                ].map((stat) => (
+                  <div key={stat.label} className="bg-secondary/40 rounded-xl p-3 text-center">
+                    <p className="text-base font-extrabold text-foreground">{stat.value}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="px-6 py-8 flex flex-col items-center justify-center gap-4 text-center border-t border-border/60 mt-4">
                 <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <Icon name="UserGroupIcon" size={30} className="text-rose-deep" />
                 </div>
                 <div>
-                  <p className="font-bold text-foreground mb-1">Owners & Staff — {selectedShop.name}</p>
+                  <p className="font-bold text-foreground mb-1">
+                    Owners & Staff — {selectedShop.name}
+                  </p>
                   <p className="text-sm text-muted-foreground max-w-md">
-                    Open the full user screen, use quick filters, manage catalog products, or open the staff CSV
-                    modal.
+                    Open the full user screen, use quick filters, manage catalog products, or open
+                    the staff CSV modal.
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row flex-wrap items-stretch justify-center gap-3 w-full max-w-2xl">
@@ -366,61 +408,11 @@ export default function ShopManagementClient() {
 
       {/* Add Shop Modal */}
       {showAddShop && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
-            onClick={() => setShowAddShop(false)}
-          />
-          <div className="relative bg-card border border-border rounded-2xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-border">
-              <h2 className="font-bold text-foreground">Register New Shop</h2>
-              <button
-                onClick={() => setShowAddShop(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-secondary transition-all"
-              >
-                <Icon name="XMarkIcon" size={18} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              {[
-                { label: 'Shop Name', key: 'name', placeholder: 'e.g. Glow Beauty Store' },
-                { label: 'Owner Name', key: 'owner_name', placeholder: 'Full name' },
-                { label: 'Description', key: 'description', placeholder: 'Brief shop description' },
-                { label: 'Category', key: 'category', placeholder: 'e.g. Serums & Moisturizers' },
-              ].map((field) => (
-                <div key={field.key}>
-                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                    {field.label}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={field.placeholder}
-                    value={newShop[field.key as keyof typeof newShop]}
-                    onChange={(e) =>
-                      setNewShop((prev) => ({ ...prev, [field.key]: e.target.value }))
-                    }
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                  />
-                </div>
-              ))}
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setShowAddShop(false)}
-                  className="flex-1 py-2.5 bg-secondary text-foreground text-sm font-semibold rounded-xl hover:bg-border transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddShop}
-                  disabled={addingShop}
-                  className="flex-1 py-2.5 bg-primary text-foreground text-sm font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose disabled:opacity-50"
-                >
-                  {addingShop ? 'Registering…' : 'Register Shop'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AddShopModal
+          onClose={() => setShowAddShop(false)}
+          onSuccess={handleAddShop}
+          adding={addingShop}
+        />
       )}
 
       {showStaffModal && selectedShop && (

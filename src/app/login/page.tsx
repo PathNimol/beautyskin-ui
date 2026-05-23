@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { startNavigation } from '@/lib/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import SocialAuthButtons, { type OAuthProvider } from '@/components/auth/SocialAuthButtons';
 import { sanitizeRedirect } from '@/lib/auth/redirects';
-import { findUserByEmail } from '@/lib/mock/authStore';
 
 const ROLE_HINTS = [
   {
@@ -37,14 +37,9 @@ const ROLE_HINTS = [
   },
 ];
 
-const OAUTH_EMAILS: Record<OAuthProvider, string> = {
-  google: 'google.user@beautyskin.com',
-  facebook: 'facebook.user@beautyskin.com',
-  tiktok: 'tiktok.user@beautyskin.com',
-};
-
 function LoginForm() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { signIn, signInWithOAuth } = useMockAuth();
   const [email, setEmail] = useState('');
@@ -55,9 +50,24 @@ function LoginForm() {
 
   const redirectParam = searchParams.get('redirect');
 
-  const goAfterLogin = (userEmail: string) => {
-    const found = findUserByEmail(userEmail);
-    router.push(sanitizeRedirect(redirectParam, found?.role ?? 'customer'));
+  // Keep button loading until we have actually left the login page
+  useEffect(() => {
+    if (loading && pathname !== '/login') {
+      setLoading(false);
+    }
+  }, [pathname, loading]);
+
+  // Safety: reset if navigation never completes (e.g. network hang)
+  useEffect(() => {
+    if (!loading) return;
+    const timeout = setTimeout(() => setLoading(false), 20000);
+    return () => clearTimeout(timeout);
+  }, [loading]);
+
+  const navigateAfterLogin = (user: { role: string }) => {
+    const dest = sanitizeRedirect(redirectParam, user.role);
+    startNavigation();
+    router.push(dest);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -65,23 +75,19 @@ function LoginForm() {
     setError('');
     setLoading(true);
     try {
-      await signIn(email, password);
-      goAfterLogin(email);
+      const user = await signIn(email, password);
+      navigateAfterLogin(user);
     } catch {
       setError('Invalid email or password. Try demo credentials below or register.');
-    } finally {
       setLoading(false);
     }
   };
 
-  const handleOAuth = async (provider: OAuthProvider) => {
+  // OAuth is now a plain redirect — no async, no try/catch needed
+  const handleOAuth = (provider: OAuthProvider) => {
     setError('');
-    try {
-      await signInWithOAuth(provider);
-      goAfterLogin(OAUTH_EMAILS[provider]);
-    } catch {
-      setError(`Could not sign in with ${provider}.`);
-    }
+    signInWithOAuth(provider);
+    // Browser will redirect to Google/Facebook — no further action here
   };
 
   return (
@@ -115,7 +121,7 @@ function MotionLoginForm(props: {
   error: string;
   loading: boolean;
   handleLogin: (e: React.FormEvent) => void;
-  handleOAuth: (p: OAuthProvider) => Promise<void>;
+  handleOAuth: (p: OAuthProvider) => void;
   fillCredentials: (e: string, p: string) => void;
 }) {
   const {
@@ -153,27 +159,61 @@ function MotionLoginForm(props: {
         )}
 
         <form onSubmit={handleLogin} className="space-y-5 mt-2">
-          <MotionEmailField email={email} setEmail={setEmail} />
-          <MotionPasswordField
-            password={password}
-            setPassword={setPassword}
-            showPassword={showPassword}
-            setShowPassword={setShowPassword}
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3.5 bg-primary text-foreground font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose disabled:opacity-60 flex items-center justify-center gap-2 min-h-[48px]"
-          >
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
-                Signing in...
-              </>
-            ) : (
-              'Sign In'
-            )}
-          </button>
+          <fieldset disabled={loading} className="space-y-5 border-0 p-0 m-0 min-w-0">
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-2">
+                Email address
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                className="w-full px-4 py-3 bg-card border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-semibold text-foreground">Password</label>
+                <Link href="/forgot-password" className="text-xs text-accent font-medium">
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  className="w-full px-4 py-3 pr-12 bg-card border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={18} />
+                </button>
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 bg-primary text-foreground font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose disabled:opacity-60 flex items-center justify-center gap-2 min-h-[48px]"
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </button>
+          </fieldset>
         </form>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
@@ -192,8 +232,9 @@ function MotionLoginForm(props: {
               <button
                 key={hint.role}
                 type="button"
+                disabled={loading}
                 onClick={() => fillCredentials(hint.email, hint.password)}
-                className={`text-left p-3 rounded-xl border text-xs transition-all hover:shadow-soft ${hint.color}`}
+                className={`text-left p-3 rounded-xl border text-xs transition-all hover:shadow-soft disabled:opacity-50 ${hint.color}`}
               >
                 <p className="font-bold">{hint.role}</p>
                 <p className="opacity-70 mt-0.5 truncate">{hint.email}</p>
@@ -212,86 +253,9 @@ function MotionLoginForm(props: {
             </span>
           </div>
         </div>
+
         <SocialAuthButtons onProvider={handleOAuth} disabled={loading} />
       </div>
-    </div>
-  );
-}
-
-function MotionEmailField({ email, setEmail }: { email: string; setEmail: (v: string) => void }) {
-  return (
-    <div>
-      <label className="block text-sm font-semibold text-foreground mb-2">Email address</label>
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="you@example.com"
-        required
-        className="w-full px-4 py-3 bg-card border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-      />
-    </div>
-  );
-}
-
-function MotionPasswordField({
-  password,
-  setPassword,
-  showPassword,
-  setShowPassword,
-}: {
-  password: string;
-  setPassword: (v: string) => void;
-  showPassword: boolean;
-  setShowPassword: (v: boolean) => void;
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="block text-sm font-semibold text-foreground">Password</label>
-        <Link href="/forgot-password" className="text-xs text-accent font-medium">
-          Forgot password?
-        </Link>
-      </div>
-      <MotionPasswordInput
-        password={password}
-        setPassword={setPassword}
-        showPassword={showPassword}
-        setShowPassword={setShowPassword}
-      />
-    </div>
-  );
-}
-
-function MotionPasswordInput({
-  password,
-  setPassword,
-  showPassword,
-  setShowPassword,
-}: {
-  password: string;
-  setPassword: (v: string) => void;
-  showPassword: boolean;
-  setShowPassword: (v: boolean) => void;
-}) {
-  return (
-    <div className="relative">
-      <input
-        type={showPassword ? 'text' : 'password'}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Enter your password"
-        required
-        className="w-full px-4 py-3 pr-12 bg-card border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-      />
-      <button
-        type="button"
-        onClick={() => setShowPassword(!showPassword)}
-        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-        aria-label={showPassword ? 'Hide password' : 'Show password'}
-      >
-        <Icon name={showPassword ? 'EyeSlashIcon' : 'EyeIcon'} size={18} />
-      </button>
     </div>
   );
 }
@@ -301,29 +265,21 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex">
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden rose-gradient-bg items-center justify-center p-12">
         <div className="absolute inset-0 dot-pattern opacity-40" />
-        <MotionLoginPanel />
+        <div className="relative z-10 text-center max-w-md">
+          <Link href="/" className="flex justify-center mb-8">
+            <AppLogo size={500} />
+          </Link>
+        </div>
       </div>
-      <Suspense fallback={<LoginFallback />}>
+      <Suspense
+        fallback={
+          <div className="flex-1 flex items-center justify-center p-12 text-muted-foreground">
+            Loading…
+          </div>
+        }
+      >
         <LoginForm />
       </Suspense>
-    </div>
-  );
-}
-
-function MotionLoginPanel() {
-  return (
-    <div className="relative z-10 text-center max-w-md">
-      <Link href="/" className="flex justify-center mb-8">
-        <AppLogo size={500} />
-      </Link>
-    </div>
-  );
-}
-
-function LoginFallback() {
-  return (
-    <div className="flex-1 flex items-center justify-center p-12 text-muted-foreground">
-      Loading…
     </div>
   );
 }
