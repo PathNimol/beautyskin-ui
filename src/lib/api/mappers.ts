@@ -1,4 +1,5 @@
-import type { MockUser, Order, Product, CustomerShipping } from '@/lib/mock/data';
+import { normalizeRoleKey } from '@/lib/auth/redirects';
+import type { MockUser, Order, Product, CustomerShipping, UserRole } from '@/lib/mock/data';
 import type { DbInventoryItem, DbNotification, DbOrder, DbShop } from '@/hooks/useRealtimeData';
 import type {
   ApiOrder,
@@ -83,7 +84,7 @@ export function mapApiUserToMock(user: ApiUser): MockUser {
     email: user.email,
     password: '',
     name: displayName,
-    role: (user.role?.toLowerCase() || 'customer') as MockUser['role'],
+    role: (normalizeRoleKey(user.role) || 'customer') as UserRole,
     shopId: user.shopId ?? undefined,
     avatar: user.avatar || '',
     avatarAlt: user.avatarAlt || displayName,

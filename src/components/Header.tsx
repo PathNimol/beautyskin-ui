@@ -5,7 +5,7 @@ import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { useCart } from '@/contexts/CartContext';
-import { getRoleHomePath } from '@/lib/auth/redirects';
+import { getRoleHomePath, normalizeRoleKey } from '@/lib/auth/redirects';
 
 const navLinks = [
   { label: 'Home', href: '/' },
@@ -45,8 +45,9 @@ export default function Header() {
 
   // Before mount, treat user as unauthenticated — matches server render
   const authed = mounted && isAuthenticated;
+  const roleKey = normalizeRoleKey(role);
   const dashboardHref =
-    role === 'customer' || role === 'buyer' ? '/customer/account' : getRoleHomePath(role);
+    roleKey === 'customer' ? '/customer/account' : getRoleHomePath(role);
 
   return (
     <>

@@ -9,7 +9,7 @@ import OtpVerification from '@/components/auth/OtpVerification';
 import SocialAuthButtons, { type OAuthProvider } from '@/components/auth/SocialAuthButtons';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { authApi } from '@/lib/api';
-import { getRoleHomePath } from '@/lib/auth/redirects';
+import { resolvePostLoginPath } from '@/lib/auth/redirects';
 
 const ROLES = [
   {
@@ -114,7 +114,7 @@ export default function RegisterPage() {
 
   const handleConfirmCode = async (code: string) => {
     const user = await confirmRegistration(form.email.trim(), code);
-    router.push(getRoleHomePath(user.role));
+    router.push(resolvePostLoginPath(null, user.role));
   };
 
   const handleResendRegistrationOtp = () =>
@@ -123,7 +123,7 @@ export default function RegisterPage() {
   const handleOAuth = async (provider: OAuthProvider) => {
     try {
       const user = await signInWithOAuth(provider);
-      router.push(getRoleHomePath(user.role));
+      router.push(resolvePostLoginPath(null, user.role));
     } catch {
       setRegisterError(`Could not sign up with ${provider}.`);
     }

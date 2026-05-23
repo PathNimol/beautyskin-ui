@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useNotificationStream } from '@/hooks/useNotificationStream';
+import type { ApiNotification } from '@/lib/api/types';
 import {
   inventoryApi,
   ordersApi,
@@ -404,11 +406,29 @@ export function useRealtimeStaff(shopId?: string) {
   };
 }
 
+/** Sync every `useRealtimeNotifications()` instance (navbar, sidebar, dashboard header). */
+export function broadcastNotificationsRefresh() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('bs-notifications-refresh'));
+  }
+}
+
 export function useRealtimeNotifications(shopId?: string) {
   const { isAuthenticated } = useMockAuth();
   const [notifications, setNotifications] = useState<DbNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastQueue, setToastQueue] = useState<DbNotification[]>([]);
+
+  const knownIdsRef = useRef<Set<string>>(new Set());
+
+  const applyList = useCallback(
+    (items: ReturnType<typeof mapApiNotification>[]) => {
+      const filtered = shopId ? items.filter((n) => !n.shop_id || n.shop_id === shopId) : items;
+      setNotifications(filtered);
+      knownIdsRef.current = new Set(filtered.map((n) => n.id));
+    },
+    [shopId]
+  );
 
   const fetchNotifications = useCallback(async () => {
     if (!isAuthenticated) {
@@ -416,30 +436,58 @@ export function useRealtimeNotifications(shopId?: string) {
       return;
     }
     try {
-      const page = await notificationsApi.listNotifications();
-      const mapped = page.content.map(mapApiNotification);
-      const filtered = shopId ? mapped.filter((n) => !n.shop_id || n.shop_id === shopId) : mapped;
-      setNotifications(filtered);
+      const page = await notificationsApi.listNotifications(1, 200);
+      applyList(page.content.map(mapApiNotification));
     } catch {
       // silent
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, shopId]);
+  }, [isAuthenticated, applyList]);
+
+  const handleStreamNotification = useCallback(
+    (raw: ApiNotification) => {
+      const mapped = mapApiNotification(raw);
+      if (shopId && mapped.shop_id && mapped.shop_id !== shopId) {
+        return;
+      }
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === mapped.id)) {
+          return prev;
+        }
+        return [mapped, ...prev];
+      });
+      if (!knownIdsRef.current.has(mapped.id)) {
+        knownIdsRef.current.add(mapped.id);
+        if (!mapped.is_read) {
+          setToastQueue((prev) => [mapped, ...prev].slice(0, 4));
+        }
+      }
+    },
+    [shopId]
+  );
+
+  useNotificationStream(handleStreamNotification);
 
   const markAsRead = useCallback(async (notifId: string) => {
     await notificationsApi.markRead(notifId);
     setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, is_read: true } : n)));
+    setToastQueue((prev) => prev.filter((n) => n.id !== notifId));
+    broadcastNotificationsRefresh();
   }, []);
 
   const markAllAsRead = useCallback(async () => {
     await notificationsApi.markAllRead();
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    setToastQueue([]);
+    broadcastNotificationsRefresh();
   }, []);
 
   const deleteNotification = useCallback(async (notifId: string) => {
     await notificationsApi.deleteNotification(notifId);
     setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+    setToastQueue((prev) => prev.filter((n) => n.id !== notifId));
+    broadcastNotificationsRefresh();
   }, []);
 
   const dismissToast = useCallback((notifId: string) => {
@@ -448,8 +496,13 @@ export function useRealtimeNotifications(shopId?: string) {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchNotifications, 30000);
+    const onRefresh = () => void fetchNotifications();
+    window.addEventListener('bs-notifications-refresh', onRefresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('bs-notifications-refresh', onRefresh);
+    };
   }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;

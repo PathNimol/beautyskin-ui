@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { startNavigation } from '@/lib/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import Icon from '@/components/ui/AppIcon';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import SocialAuthButtons, { type OAuthProvider } from '@/components/auth/SocialAuthButtons';
-import { sanitizeRedirect } from '@/lib/auth/redirects';
+import { resolvePostLoginPath } from '@/lib/auth/redirects';
 
 const ROLE_HINTS = [
   {
@@ -39,47 +39,54 @@ const ROLE_HINTS = [
 
 function LoginForm() {
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { signIn, signInWithOAuth } = useMockAuth();
+  const { signIn, signInWithOAuth, isAuthenticated, user, loading: authLoading } = useMockAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const navigatingRef = useRef(false);
 
   const redirectParam = searchParams.get('redirect');
 
-  // Keep button loading until we have actually left the login page
-  useEffect(() => {
-    if (loading && pathname !== '/login') {
-      setLoading(false);
-    }
-  }, [pathname, loading]);
+  const goAfterLogin = useCallback(
+    (redirect: string | null, role: string) => {
+      if (navigatingRef.current) return;
+      navigatingRef.current = true;
+      const dest = resolvePostLoginPath(redirect, role);
+      startNavigation();
+      router.replace(dest);
+    },
+    [router]
+  );
 
-  // Safety: reset if navigation never completes (e.g. network hang)
+  // Warm likely post-login routes (client navigation is much faster than full reload)
   useEffect(() => {
-    if (!loading) return;
-    const timeout = setTimeout(() => setLoading(false), 20000);
-    return () => clearTimeout(timeout);
-  }, [loading]);
+    router.prefetch('/owner/dashboard');
+    router.prefetch('/admin/dashboard');
+    router.prefetch('/staff/dashboard');
+    router.prefetch('/customer/products');
+  }, [router]);
 
-  const navigateAfterLogin = (user: { role: string }) => {
-    const dest = sanitizeRedirect(redirectParam, user.role);
-    startNavigation();
-    router.push(dest);
-  };
+  // Already signed in — send to role dashboard (not marketing home)
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !user || loading) return;
+    goAfterLogin(redirectParam, user.role);
+  }, [authLoading, isAuthenticated, user, redirectParam, goAfterLogin, loading]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const user = await signIn(email, password);
-      navigateAfterLogin(user);
+      const signedInUser = await signIn(email, password);
+      setLoading(false);
+      goAfterLogin(redirectParam, signedInUser.role);
     } catch {
       setError('Invalid email or password. Try demo credentials below or register.');
       setLoading(false);
+      navigatingRef.current = false;
     }
   };
 

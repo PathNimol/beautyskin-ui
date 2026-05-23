@@ -6,7 +6,7 @@ import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import StaffManagementModal from '@/components/StaffManagementModal';
 import AddShopModal from './AddShopModal';
-import { useRealtimeShops } from '@/hooks/useRealtimeData';
+import { broadcastNotificationsRefresh, useRealtimeShops } from '@/hooks/useRealtimeData';
 import { shopsApi } from '@/lib/api';
 import { STATUS_COLORS, STATUS_LABELS, type ShopStatus, type NewShopForm } from './shop-types';
 import { useMockAuth } from '@/contexts/MockAuthContext';
@@ -16,7 +16,6 @@ export default function ShopManagementClient() {
   const { role } = useMockAuth();
   const isAdmin = role === 'admin';
 
-  console.log('role:', role, 'isAdmin:', isAdmin);
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const [showAddShop, setShowAddShop] = useState(false);
   const [filterStatus, setFilterStatus] = useState<ShopStatus | 'all'>('all');
@@ -59,6 +58,7 @@ export default function ShopManagementClient() {
       showToast(`${form.name} registered successfully.`);
       setShowAddShop(false);
       refetch();
+      broadcastNotificationsRefresh();
     } catch (e) {
       showToast('Failed to register shop: ' + (e instanceof Error ? e.message : 'Error'));
     } finally {
@@ -74,6 +74,7 @@ export default function ShopManagementClient() {
         status === 'active' ? 'approved' : status === 'suspended' ? 'rejected' : `set to ${status}`;
       showToast(`"${shop?.name}" has been ${label}.`);
       refetch();
+      broadcastNotificationsRefresh();
     } catch (e) {
       showToast('Failed to update status: ' + (e instanceof Error ? e.message : 'Error'));
     }

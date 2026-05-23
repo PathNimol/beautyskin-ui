@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { isPublicRoute } from '@/lib/auth/publicRoutes';
+import { normalizeRoleKey } from '@/lib/auth/redirects';
 import { authApi, mapApiUserToMock, saveAuthTokens, clearAuthTokens, ApiError } from '@/lib/api';
 import type { TokenPayload } from '@/lib/api/services/auth';
 import type { RegisterPendingResponse } from '@/lib/api/types';
@@ -54,8 +55,11 @@ export const useMockAuth = () => {
 };
 
 function normalizeRole(role: string): UserRole {
-  if (role === 'buyer') return 'customer';
-  return role.toLowerCase() as UserRole;
+  const key = normalizeRoleKey(role);
+  if (key === 'admin' || key === 'owner' || key === 'staff' || key === 'customer') {
+    return key;
+  }
+  return 'customer';
 }
 
 function normalizeUser(u: MockUser): MockUser {
@@ -107,6 +111,8 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
   const [user, setUser] = useState<MockUser | null>(() => readCachedUser());
   const [loading, setLoading] = useState(() => initialAuthLoading(pathname));
   const protectedSessionSynced = useRef(false);
+  /** Skip redundant GET /users/me right after login/register (user already in token response). */
+  const skipNextPublicLoadSession = useRef(false);
 
   const loadSession = useCallback(async (options?: { blockUi?: boolean }) => {
     const blockUi = options?.blockUi ?? true;
@@ -145,6 +151,10 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
 
     if (isPublic && hasTokens) {
       setLoading(false);
+      if (skipNextPublicLoadSession.current) {
+        skipNextPublicLoadSession.current = false;
+        return;
+      }
       void loadSession({ blockUi: false });
       return;
     }
@@ -169,6 +179,7 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
   const establishFromTokenPayload = useCallback((res: TokenPayload): MockUser => {
     const normalized = normalizeUser(mapApiUserToMock(res.user));
     protectedSessionSynced.current = true;
+    skipNextPublicLoadSession.current = true;
     setUser(normalized);
     persistSession(normalized, {
       accessToken: res.accessToken,

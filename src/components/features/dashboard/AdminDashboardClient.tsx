@@ -20,6 +20,7 @@ import {
 } from 'recharts';
 
 import { useAdminDashboard } from '@/hooks/useApiLists';
+import { useRealtimeNotifications } from '@/hooks/useRealtimeData';
 import { mapApiOrderToDashboardRow } from '@/lib/api/mappers';
 
 // ─── KPI layout (values filled from GET /api/admin/dashboard) ─────────────────
@@ -137,6 +138,7 @@ function formatRevenue(amount: number): string {
 
 export default function AdminDashboardClient() {
   const { data: adminData, loading: adminLoading } = useAdminDashboard();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useRealtimeNotifications();
 
   const kpis = useMemo(
     () => [
@@ -254,7 +256,7 @@ export default function AdminDashboardClient() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Notifications */}
+          {/* In-app notifications (SSE + API) */}
           <div className="relative">
             <button
               onClick={() => setNotifOpen(!notifOpen)}
@@ -262,66 +264,53 @@ export default function AdminDashboardClient() {
               aria-label="Notifications"
             >
               <Icon name="BellIcon" size={18} className="text-foreground" />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                {totalAlerts}
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </button>
 
             {notifOpen && (
               <div className="absolute right-0 top-12 w-80 bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                  <h3 className="font-bold text-foreground text-sm">Alerts</h3>
-                  <span className="text-xs text-muted-foreground">{totalAlerts} active</span>
+                  <h3 className="font-bold text-foreground text-sm">Notifications</h3>
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={markAllAsRead}
+                      className="text-xs font-semibold text-accent hover:text-gold-deep transition-colors"
+                    >
+                      Mark all read
+                    </button>
+                  )}
                 </div>
                 <div className="divide-y divide-border max-h-72 overflow-y-auto">
-                  {lowStockAlerts.map((alert) => (
-                    <div key={alert.name} className="px-5 py-3.5 hover:bg-secondary transition-all">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${alert.severity === 'critical' ? 'bg-red-50' : 'bg-amber-50'}`}
-                        >
-                          <Icon
-                            name="ExclamationTriangleIcon"
-                            size={15}
-                            className={
-                              alert.severity === 'critical' ? 'text-red-500' : 'text-amber-500'
-                            }
-                          />
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-foreground">{alert.name}</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">
-                            Low stock: {alert.stock}/{alert.threshold} units
-                            {alert.shopName ? ` · ${alert.shopName}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {expiredProducts.map((p) => (
-                    <div key={p.batch} className="px-5 py-3.5 hover:bg-secondary transition-all">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-red-50">
-                          <Icon name="ClockIcon" size={15} className="text-red-500" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-foreground">{p.name}</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">
-                            Expired {p.expiredOn} · {p.qty} units
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  {notifications.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">No notifications</div>
+                  ) : (
+                    notifications.slice(0, 12).map((n) => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        onClick={() => markAsRead(n.id)}
+                        className={`w-full text-left px-5 py-3.5 hover:bg-secondary transition-all ${
+                          !n.is_read ? 'bg-primary/5' : ''
+                        }`}
+                      >
+                        <p className="text-xs font-semibold text-foreground">{n.title}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                      </button>
+                    ))
+                  )}
                 </div>
-                <div className="px-5 py-3 border-t border-border">
-                  <button
-                    onClick={() => setNotifOpen(false)}
-                    className="text-xs font-semibold text-accent hover:text-gold-deep transition-colors"
-                  >
-                    Dismiss all
-                  </button>
-                </div>
+                {totalAlerts > 0 && (
+                  <div className="px-5 py-2 border-t border-border bg-secondary/30">
+                    <p className="text-[10px] text-muted-foreground">
+                      {totalAlerts} inventory alert{totalAlerts !== 1 ? 's' : ''} on dashboard below
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

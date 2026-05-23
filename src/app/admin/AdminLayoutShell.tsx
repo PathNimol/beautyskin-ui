@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/features/dashboard/AdminSidebar';
 import { useMockAuth } from '@/contexts/MockAuthContext';
+import { getRoleHomePath, normalizeRoleKey } from '@/lib/auth/redirects';
 
 export default function AdminLayoutShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useMockAuth();
@@ -17,8 +18,8 @@ export default function AdminLayoutShell({ children }: { children: React.ReactNo
       router.replace(`/login?redirect=${dest}`);
       return;
     }
-    if (user.role !== 'admin') {
-      router.replace('/');
+    if (normalizeRoleKey(user.role) !== 'admin') {
+      router.replace(getRoleHomePath(user.role));
     }
   }, [user, loading, router, pathname]);
 
@@ -30,7 +31,7 @@ export default function AdminLayoutShell({ children }: { children: React.ReactNo
     );
   }
 
-  if (!user || user.role !== 'admin') {
+  if (!user || normalizeRoleKey(user.role) !== 'admin') {
     return (
       <div className="flex min-h-screen bg-admin-bg items-center justify-center p-8">
         <p className="text-sm text-muted-foreground">Redirecting…</p>

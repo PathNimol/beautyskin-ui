@@ -102,7 +102,68 @@ export default function AdminSidebar() {
       </nav>
 
       {/* Bottom actions */}
-      <div className="p-3 border-t border-border">
+      <div className="p-3 border-t border-border space-y-0.5">
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => setNotifOpen((o) => !o)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-all min-h-[44px] ${
+              collapsed ? 'justify-center px-2' : ''
+            }`}
+            aria-label="Notifications"
+          >
+            <div className="relative shrink-0">
+              <Icon name="BellIcon" size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-primary text-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </div>
+            {!collapsed && <span className="flex-1 text-left">Notifications</span>}
+            {!collapsed && unreadCount > 0 && (
+              <span className="ml-auto bg-primary text-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+          {notifOpen && (
+            <div className="absolute bottom-full left-0 mb-2 w-80 bg-card border border-border rounded-2xl shadow-xl z-[200] overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <p className="text-sm font-bold text-foreground">Notifications</p>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="text-[11px] text-primary font-semibold hover:underline"
+                  >
+                    Mark all read
+                  </button>
+                )}
+              </div>
+              <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                {notifications.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">No notifications</div>
+                ) : (
+                  notifications.slice(0, 20).map((n) => (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => markAsRead(n.id)}
+                      className={`w-full text-left px-4 py-3 hover:bg-secondary transition-all ${
+                        !n.is_read ? 'bg-primary/5' : ''
+                      }`}
+                    >
+                      <p className="text-xs font-semibold text-foreground">{n.title}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                      <p className="text-[10px] text-muted-foreground/60 mt-1">
+                        {new Date(n.created_at).toLocaleString()}
+                      </p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         <Link
           href="/"
           onClick={() => setMobileOpen(false)}
