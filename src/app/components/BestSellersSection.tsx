@@ -5,9 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppImage from '@/components/ui/AppImage';
 import Icon from '@/components/ui/AppIcon';
-import { useCart } from '@/contexts/CartContext';
+import ProductCardCartControl from '@/components/cart/ProductCardCartControl';
 import { useShowcaseProducts } from '@/hooks/useShowcaseProducts';
-import type { CatalogProduct } from '@/lib/mock/productCatalog';
 import { isStaticShowcaseId } from '@/lib/catalog/showcaseStatic';
 
 const filterTabs = ['All', 'Moisturizers', 'Serums', 'Cleansers', 'Sunscreen'];
@@ -39,36 +38,15 @@ function StarRating({ rating }: { rating: number }) {
 
 export default function BestSellersSection() {
   const router = useRouter();
-  const { addItem } = useCart();
   const { products: showcaseProducts, loading, error, apiConnected } = useShowcaseProducts();
 
   const [activeFilter, setActiveFilter] = useState('All');
-  const [cartAdded, setCartAdded] = useState<string[]>([]);
 
   const filtered = useMemo(() => {
     if (activeFilter === 'All') return showcaseProducts;
     const tab = activeFilter.toLowerCase();
     return showcaseProducts.filter((p) => p.category.toLowerCase() === tab);
   }, [activeFilter, showcaseProducts]);
-
-  const handleAddToCart = (product: CatalogProduct, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!product.inStock || product.stock === 0 || isStaticShowcaseId(product.id)) return;
-    addItem({
-      id: product.id,
-      productId: product.id,
-      name: product.name,
-      brand: product.brand,
-      price: product.price,
-      image: product.image,
-      alt: product.alt,
-      shopId: product.shopId,
-      shopName: product.shopName,
-    });
-    setCartAdded((prev) => [...prev, product.id]);
-    setTimeout(() => setCartAdded((prev) => prev.filter((x) => x !== product.id)), 2000);
-  };
 
   return (
     <section className="py-16 md:py-20 px-6 bg-secondary/40">
@@ -125,17 +103,19 @@ export default function BestSellersSection() {
                   </div>
                 </div>
               ))
-            : filtered.map((product, i) => (
-                <Link
+            : filtered.map((product, i) => {
+                const detailHref = isStaticShowcaseId(product.id)
+                  ? '/product-listing'
+                  : `/product-detail/${product.id}`;
+                const staticPreview = isStaticShowcaseId(product.id);
+
+                return (
+                <article
                   key={`${activeFilter}-${product.sku}`}
-                  href={
-                    isStaticShowcaseId(product.id)
-                      ? '/product-listing'
-                      : `/product-detail/${product.id}`
-                  }
                   className="scroll-animate bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-rose transition-all duration-300 hover:-translate-y-1 group flex flex-col"
                   style={{ transitionDelay: `${i * 60}ms` }}
                 >
+                  <Link href={detailHref} className="block">
                   <div className="relative h-52 overflow-hidden shimmer-wrapper">
                     <AppImage
                       src={product.image}
@@ -175,8 +155,10 @@ export default function BestSellersSection() {
                       <Icon name="HeartIcon" size={14} className="text-muted-foreground" />
                     </button>
                   </div>
+                  </Link>
 
                   <div className="p-4 flex flex-col flex-1">
+                    <Link href={detailHref} className="block flex-1">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-accent mb-1">
                       {product.brand}
                     </p>
@@ -201,34 +183,22 @@ export default function BestSellersSection() {
                         </span>
                       )}
                     </div>
+                    </Link>
 
-                    <button
-                      type="button"
-                      onClick={(e) => handleAddToCart(product, e)}
-                      disabled={!product.inStock || isStaticShowcaseId(product.id)}
-                      className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 min-h-[44px] ${
-                        !product.inStock
-                          ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                          : cartAdded.includes(product.id)
-                            ? 'bg-green-500 text-white'
-                            : 'bg-primary text-foreground hover:bg-rose-deep hover:text-white shadow-rose'
-                      }`}
-                    >
-                      {cartAdded.includes(product.id) ? (
-                        <>
-                          <Icon name="CheckIcon" size={15} />
-                          Added!
-                        </>
-                      ) : (
-                        <>
-                          <Icon name="ShoppingBagIcon" size={15} />
-                          Add to Cart
-                        </>
-                      )}
-                    </button>
+                    {staticPreview ? (
+                      <Link
+                        href="/product-listing"
+                        className="flex min-h-[44px] w-full items-center justify-center rounded-xl bg-primary text-sm font-bold text-foreground shadow-rose hover:bg-rose-deep hover:text-white"
+                      >
+                        View products
+                      </Link>
+                    ) : (
+                      <ProductCardCartControl product={product} />
+                    )}
                   </div>
-                </Link>
-              ))}
+                </article>
+              );
+              })}
         </div>
 
         {!loading && filtered.length === 0 && (

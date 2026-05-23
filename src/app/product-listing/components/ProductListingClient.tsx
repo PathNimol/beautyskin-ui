@@ -5,7 +5,7 @@ import Link from 'next/link';
 import AppImage from '@/components/ui/AppImage';
 import CatalogPagination from '@/components/ui/CatalogPagination';
 import Icon from '@/components/ui/AppIcon';
-import { useCart } from '@/contexts/CartContext';
+import ProductCardCartControl from '@/components/cart/ProductCardCartControl';
 import { type CatalogProduct } from '@/lib/mock/productCatalog';
 import { useCatalogProducts } from '@/hooks/useCatalogProducts';
 import { shopsApi, type ApiShop } from '@/lib/api';
@@ -157,15 +157,12 @@ function ShopDropdown({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProductListingClient({ embedded = false }: { embedded?: boolean }) {
-  const { addItem } = useCart();
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeShopId, setActiveShopId] = useState<string>('All');
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [activePriceRange, setActivePriceRange] = useState(0);
   const [activeSort, setActiveSort] = useState<string>('Featured');
-  const [cartAdded, setCartAdded] = useState<string[]>([]);
-  const [addingId, setAddingId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Debounce search input
@@ -246,31 +243,6 @@ export default function ProductListingClient({ embedded = false }: { embedded?: 
         ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     },
     [setPage]
-  );
-
-  const handleAddToCart = useCallback(
-    async (product: CatalogProduct) => {
-      if (!product.inStock || product.stock === 0) return;
-      setAddingId(product.id);
-      try {
-        await addItem({
-          id: product.id,
-          productId: product.id,
-          name: product.name,
-          brand: product.brand,
-          price: product.price,
-          image: product.image,
-          alt: product.alt,
-          shopId: product.shopId,
-          shopName: product.shopName,
-        });
-        setCartAdded((prev) => [...prev, product.id]);
-        setTimeout(() => setCartAdded((prev) => prev.filter((x) => x !== product.id)), 2000);
-      } finally {
-        setAddingId((current) => (current === product.id ? null : current));
-      }
-    },
-    [addItem]
   );
 
   const clearFilters = () => {
@@ -614,8 +586,6 @@ export default function ProductListingClient({ embedded = false }: { embedded?: 
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                   {products.map((product) => {
                     const detailHref = `${productDetailBase}/${product.id}`;
-                    const isAdding = addingId === product.id;
-                    const isAdded = cartAdded.includes(product.id);
 
                     return (
                       <article
@@ -677,33 +647,9 @@ export default function ProductListingClient({ embedded = false }: { embedded?: 
                               </span>
                             )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => void handleAddToCart(product)}
-                            disabled={!product.inStock || isAdding}
-                            className={`mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all ${
-                              !product.inStock
-                                ? 'cursor-not-allowed bg-muted text-muted-foreground'
-                                : isAdded
-                                  ? 'bg-green-600 text-white'
-                                  : 'bg-primary text-foreground shadow-rose hover:bg-rose-deep hover:text-white'
-                            }`}
-                          >
-                            {isAdding ? (
-                              <>
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
-                                Adding…
-                              </>
-                            ) : isAdded ? (
-                              <>
-                                <Icon name="CheckIcon" size={15} /> Added
-                              </>
-                            ) : (
-                              <>
-                                <Icon name="ShoppingBagIcon" size={15} /> Add to cart
-                              </>
-                            )}
-                          </button>
+                          <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                            <ProductCardCartControl product={product} />
+                          </div>
                         </div>
                       </article>
                     );

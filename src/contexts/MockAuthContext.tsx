@@ -103,19 +103,11 @@ function readCachedUser(): MockUser | null {
   }
 }
 
-function initialAuthLoading(pathname: string): boolean {
-  if (typeof window === 'undefined') return true;
-  const hasTokens = !!localStorage.getItem(TOKEN_KEY);
-  if (!hasTokens) return false;
-  // Keep loading true until the first session sync — avoids SSR/client role mismatch
-  if (!isPublicRoute(pathname) && hasTokens) return true;
-  return false;
-}
-
 export const MockAuthProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const [user, setUser] = useState<MockUser | null>(() => readCachedUser());
-  const [loading, setLoading] = useState(() => initialAuthLoading(pathname));
+  // Always start null/true so SSR and the first client paint match (no localStorage in useState).
+  const [user, setUser] = useState<MockUser | null>(null);
+  const [loading, setLoading] = useState(true);
   const protectedSessionSynced = useRef(false);
   /** Skip redundant GET /users/me right after login/register (user already in token response). */
   const skipNextPublicLoadSession = useRef(false);

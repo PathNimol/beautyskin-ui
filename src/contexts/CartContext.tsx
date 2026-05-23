@@ -99,6 +99,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, loadLocal]);
 
   useEffect(() => {
+    loadLocal();
+  }, [loadLocal]);
+
+  useEffect(() => {
     if (authLoading) return;
     refreshCart();
   }, [refreshCart, isAuthenticated, authLoading]);
