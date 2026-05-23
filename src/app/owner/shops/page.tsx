@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import ShopManagementClient from '@/components/features/shop/ShopManagementClient';
+import ShopManagementPage from '@/components/features/shop/ShopManagementPage';
 
 export default function OwnerStaffPage() {
-  return <ShopManagementClient />;
+  return <ShopManagementPage />;
 }

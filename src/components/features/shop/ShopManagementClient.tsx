@@ -1,20 +1,28 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import Icon from '@/components/ui/AppIcon';
 import AppImage from '@/components/ui/AppImage';
 import StaffManagementModal from '@/components/StaffManagementModal';
 import AddShopModal from './AddShopModal';
+import AdminShopNameChangeModal, {
+  usePendingNameChangeCount,
+} from './AdminShopNameChangeModal';
+import OwnerShopNameChangeModal from './OwnerShopNameChangeModal';
 import { broadcastNotificationsRefresh, useRealtimeShops } from '@/hooks/useRealtimeData';
 import { shopsApi } from '@/lib/api';
 import { STATUS_COLORS, STATUS_LABELS, type ShopStatus, type NewShopForm } from './shop-types';
 import { useMockAuth } from '@/contexts/MockAuthContext';
+import { normalizeRoleKey } from '@/lib/auth/redirects';
+import { OPEN_NAME_REQUESTS_EVENT } from '@/lib/notifications/navigation';
 
 export default function ShopManagementClient() {
   const { shops, loading, refetch } = useRealtimeShops();
-  const { role } = useMockAuth();
-  const isAdmin = role === 'admin';
+  const { role, user } = useMockAuth();
+  const isAdmin = normalizeRoleKey(role) === 'admin';
+  const isOwner = normalizeRoleKey(role) === 'owner';
 
   const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
   const [showAddShop, setShowAddShop] = useState(false);
@@ -22,20 +30,41 @@ export default function ShopManagementClient() {
   const [addingShop, setAddingShop] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [showStaffModal, setShowStaffModal] = useState(false);
+  const [showAdminNameModal, setShowAdminNameModal] = useState(false);
+  const [showOwnerNameModal, setShowOwnerNameModal] = useState(false);
+  const searchParams = useSearchParams();
+  const { count: pendingNameCount, refresh: refreshNameCount } = usePendingNameChangeCount(isAdmin);
+
+  useEffect(() => {
+    if (searchParams.get('nameRequests') === '1' && isAdmin) {
+      setShowAdminNameModal(true);
+    }
+  }, [searchParams, isAdmin]);
+
+  useEffect(() => {
+    const open = () => setShowAdminNameModal(true);
+    window.addEventListener(OPEN_NAME_REQUESTS_EVENT, open);
+    return () => window.removeEventListener(OPEN_NAME_REQUESTS_EVENT, open);
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 4000);
   };
 
+  const visibleShops = isOwner && user?.id
+    ? shops.filter((s) => s.owner_id === user.id)
+    : shops;
   const filteredShops =
-    filterStatus === 'all' ? shops : shops.filter((s) => s.shop_status === filterStatus);
-  const selectedShop = shops.find((s) => s.id === selectedShopId) || null;
+    filterStatus === 'all' ? visibleShops : visibleShops.filter((s) => s.shop_status === filterStatus);
+  const selectedShop = visibleShops.find((s) => s.id === selectedShopId) || null;
+  const canRequestNameChange =
+    isOwner && selectedShop != null && user?.id != null && selectedShop.owner_id === user.id;
 
   const totalStats = {
-    shops: shops.length,
-    active: shops.filter((s) => s.shop_status === 'active').length,
-    revenue: shops.reduce((sum, s) => sum + Number(s.revenue), 0),
+    shops: visibleShops.length,
+    active: visibleShops.filter((s) => s.shop_status === 'active').length,
+    revenue: visibleShops.reduce((sum, s) => sum + Number(s.revenue), 0),
   };
 
   const handleAddShop = async (form: NewShopForm) => {
@@ -92,13 +121,32 @@ export default function ShopManagementClient() {
             Manage registered shops, owners, and their staff
           </p>
         </div>
-        <button
-          onClick={() => setShowAddShop(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-foreground text-sm font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose"
-        >
-          <Icon name="PlusIcon" size={16} />
-          <span className="hidden sm:inline">Register Shop</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowAdminNameModal(true)}
+              className="relative flex items-center gap-2 px-4 py-2.5 bg-violet-100 text-violet-800 text-sm font-bold rounded-xl hover:bg-violet-200 transition-all border border-violet-200"
+            >
+              <Icon name="PencilSquareIcon" size={16} />
+              <span className="hidden sm:inline">Name requests</span>
+              {pendingNameCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-violet-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                  {pendingNameCount > 9 ? '9+' : pendingNameCount}
+                </span>
+              )}
+            </button>
+          )}
+          {(isAdmin || isOwner) && (
+            <button
+              onClick={() => setShowAddShop(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-primary text-foreground text-sm font-bold rounded-xl hover:bg-rose-deep hover:text-white transition-all shadow-rose"
+            >
+              <Icon name="PlusIcon" size={16} />
+              <span className="hidden sm:inline">Register Shop</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Toast */}
@@ -150,16 +198,16 @@ export default function ShopManagementClient() {
       </div>
 
       {/* Pending Approvals Banner — admin only */}
-      {isAdmin && shops.filter((s) => s.shop_status === 'pending').length > 0 && (
+      {isAdmin && visibleShops.filter((s) => s.shop_status === 'pending').length > 0 && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
           <div className="px-5 py-3 border-b border-amber-200 flex items-center gap-2">
             <Icon name="ClockIcon" size={16} className="text-amber-600 shrink-0" />
             <p className="text-sm font-bold text-amber-700">
-              Pending Approvals ({shops.filter((s) => s.shop_status === 'pending').length})
+              Pending Approvals ({visibleShops.filter((s) => s.shop_status === 'pending').length})
             </p>
           </div>
           <div className="divide-y divide-amber-100">
-            {shops
+            {visibleShops
               .filter((s) => s.shop_status === 'pending')
               .map((shop) => (
                 <div key={shop.id} className="flex items-center gap-3 px-5 py-3 flex-wrap">
@@ -342,7 +390,20 @@ export default function ShopManagementClient() {
                 ))}
               </div>
 
-              <div className="px-6 py-8 flex flex-col items-center justify-center gap-4 text-center border-t border-border/60 mt-4">
+              {canRequestNameChange && (
+                <div className="px-6 py-4 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setShowOwnerNameModal(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-secondary border border-border text-sm font-bold text-foreground rounded-xl hover:bg-primary/10 transition-all"
+                  >
+                    <Icon name="PencilSquareIcon" size={16} className="text-rose-deep" />
+                    Change shop name
+                  </button>
+                </div>
+              )}
+
+              <div className="px-6 py-8 flex flex-col items-center justify-center gap-4 text-center border-t border-border/60">
                 <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <Icon name="UserGroupIcon" size={30} className="text-rose-deep" />
                 </div>
@@ -423,6 +484,28 @@ export default function ShopManagementClient() {
           onClose={() => setShowStaffModal(false)}
         />
       )}
+
+      <AdminShopNameChangeModal
+        open={showAdminNameModal}
+        onClose={() => setShowAdminNameModal(false)}
+        showToast={showToast}
+        onReviewed={() => {
+          refetch();
+          refreshNameCount();
+          broadcastNotificationsRefresh();
+        }}
+      />
+
+      <OwnerShopNameChangeModal
+        open={showOwnerNameModal}
+        shop={selectedShop}
+        onClose={() => setShowOwnerNameModal(false)}
+        showToast={showToast}
+        onSubmitted={() => {
+          refetch();
+          broadcastNotificationsRefresh();
+        }}
+      />
     </div>
   );
 }

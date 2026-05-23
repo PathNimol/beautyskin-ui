@@ -7,6 +7,7 @@ import Icon from '@/components/ui/AppIcon';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeData';
+import { useNotificationClick } from '@/hooks/useNotificationClick';
 import { useEffect, useRef } from 'react';
 
 const navItems = [
@@ -30,6 +31,7 @@ export default function AdminSidebar() {
   const [signOutOpen, setSignOutOpen] = useState(false);
 
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useRealtimeNotifications();
+  const { onNotificationClick } = useNotificationClick(markAsRead);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -147,7 +149,9 @@ export default function AdminSidebar() {
                     <button
                       key={n.id}
                       type="button"
-                      onClick={() => markAsRead(n.id)}
+                      onClick={() =>
+                        void onNotificationClick(n, { closePanel: () => setNotifOpen(false) })
+                      }
                       className={`w-full text-left px-4 py-3 hover:bg-secondary transition-all ${
                         !n.is_read ? 'bg-primary/5' : ''
                       }`}

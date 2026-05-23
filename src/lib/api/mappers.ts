@@ -211,13 +211,28 @@ export function mapApiInventory(i: ApiInventoryItem): DbInventoryItem {
 }
 
 export function mapApiNotification(n: ApiNotification): DbNotification {
+  const raw = (n.type ?? 'SYSTEM').toLowerCase();
+  const known: DbNotification['type'][] = [
+    'new_order',
+    'low_stock',
+    'expiry_alert',
+    'promotion',
+    'review',
+    'shop_approval',
+    'shop_name_change',
+    'system',
+  ];
+  const type = known.includes(raw as DbNotification['type'])
+    ? (raw as DbNotification['type'])
+    : 'system';
   return {
     id: n.id,
     shop_id: n.shopId ?? null,
-    type: (n.type?.toLowerCase() as DbNotification['type']) ?? 'system',
+    type,
     title: n.title,
     message: n.message,
     is_read: n.read,
+    link: n.link ?? null,
     metadata: {},
     created_at: n.createdAt,
   };

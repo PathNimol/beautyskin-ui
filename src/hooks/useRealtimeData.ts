@@ -117,10 +117,12 @@ export interface DbNotification {
     | 'promotion'
     | 'review'
     | 'system'
-    | 'shop_approval';
+    | 'shop_approval'
+    | 'shop_name_change';
   title: string;
   message: string;
   is_read: boolean;
+  link: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
 }

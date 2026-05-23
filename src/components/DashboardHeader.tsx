@@ -8,6 +8,7 @@ import AppImage from '@/components/ui/AppImage';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useMockAuth } from '@/contexts/MockAuthContext';
 import { useRealtimeNotifications, type DbNotification } from '@/hooks/useRealtimeData';
+import { useNotificationClick } from '@/hooks/useNotificationClick';
 import type { UserRole } from '@/lib/mock/data';
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -26,6 +27,7 @@ const NOTIF_ICON: Record<DbNotification['type'], string> = {
   review: 'StarIcon',
   system: 'BellIcon',
   shop_approval: 'BuildingStorefrontIcon',
+  shop_name_change: 'PencilSquareIcon',
 };
 
 const NOTIF_COLOR: Record<DbNotification['type'], string> = {
@@ -36,6 +38,7 @@ const NOTIF_COLOR: Record<DbNotification['type'], string> = {
   review: 'bg-blue-50 text-blue-500',
   system: 'bg-secondary text-muted-foreground',
   shop_approval: 'bg-amber-50 text-amber-600',
+  shop_name_change: 'bg-violet-50 text-violet-600',
 };
 
 function profileHref(role: UserRole | null): string {
@@ -81,6 +84,7 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
 
   const { notifications, unreadCount, toastQueue, markAsRead, markAllAsRead, dismissToast } =
     useRealtimeNotifications();
+  const { onNotificationClick } = useNotificationClick(markAsRead);
 
   const handleSignOut = () => {
     setProfileOpen(false);
@@ -158,7 +162,9 @@ export default function DashboardHeader({ title, subtitle }: { title: string; su
                     notifications.slice(0, 8).map((n) => (
                       <div
                         key={n.id}
-                        onClick={() => markAsRead(n.id)}
+                        onClick={() =>
+                          void onNotificationClick(n, { closePanel: () => setNotifOpen(false) })
+                        }
                         className={`px-5 py-3.5 hover:bg-secondary transition-all cursor-pointer ${
                           !n.is_read ? 'bg-primary/5' : ''
                         }`}

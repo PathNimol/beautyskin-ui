@@ -8,6 +8,7 @@ import AppImage from '@/components/ui/AppImage';
 import { ROLE_COLORS, ROLE_LABELS, profileHref, type NavItem } from './nav-items';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeData';
 import type { DbNotification } from '@/hooks/useRealtimeData';
+import { useNotificationClick } from '@/hooks/useNotificationClick';
 
 interface SidebarContentProps {
   collapsed?: boolean;
@@ -36,6 +37,7 @@ export default function SidebarContent({
       : pathname === href || pathname.startsWith(href + '/');
 
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useRealtimeNotifications();
+  const { onNotificationClick } = useNotificationClick(markAsRead);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -185,7 +187,9 @@ export default function SidebarContent({
                   notifications.slice(0, 20).map((n: DbNotification) => (
                     <button
                       key={n.id}
-                      onClick={() => markAsRead(n.id)}
+                      onClick={() =>
+                        void onNotificationClick(n, { closePanel: () => setNotifOpen(false) })
+                      }
                       className={`w-full text-left px-4 py-3 hover:bg-secondary transition-all ${
                         !n.is_read ? 'bg-primary/5' : ''
                       }`}

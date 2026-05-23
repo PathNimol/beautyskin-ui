@@ -18,6 +18,7 @@ export * as analyticsApi from './services/analytics';
 export * as posApi from './services/pos';
 export * as supplierPurchasesApi from './services/supplierPurchases';
 export * as revokeRequestsApi from './services/revokeRequests';
+export * as shopNameChangeRequestsApi from './services/shopNameChangeRequests';
 export * as chatApi from './services/chat';
 export * as directMessagesApi from './services/directMessages';
 export * as shopStaffApi from './services/shopStaff';

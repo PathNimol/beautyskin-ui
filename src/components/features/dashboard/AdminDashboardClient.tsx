@@ -21,6 +21,7 @@ import {
 
 import { useAdminDashboard } from '@/hooks/useApiLists';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeData';
+import { useNotificationClick } from '@/hooks/useNotificationClick';
 import { mapApiOrderToDashboardRow } from '@/lib/api/mappers';
 
 // ─── KPI layout (values filled from GET /api/admin/dashboard) ─────────────────
@@ -139,6 +140,7 @@ function formatRevenue(amount: number): string {
 export default function AdminDashboardClient() {
   const { data: adminData, loading: adminLoading } = useAdminDashboard();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useRealtimeNotifications();
+  const { onNotificationClick } = useNotificationClick(markAsRead);
 
   const kpis = useMemo(
     () => [
@@ -293,7 +295,9 @@ export default function AdminDashboardClient() {
                       <button
                         key={n.id}
                         type="button"
-                        onClick={() => markAsRead(n.id)}
+                        onClick={() =>
+                          void onNotificationClick(n, { closePanel: () => setNotifOpen(false) })
+                        }
                         className={`w-full text-left px-5 py-3.5 hover:bg-secondary transition-all ${
                           !n.is_read ? 'bg-primary/5' : ''
                         }`}

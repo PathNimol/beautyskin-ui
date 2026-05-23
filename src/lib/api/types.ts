@@ -343,6 +343,20 @@ export interface ApiRevokeRequest {
   createdAt?: string;
 }
 
+export interface ApiShopNameChangeRequest {
+  id: string;
+  shopId: string;
+  shopName?: string;
+  ownerName?: string;
+  currentName: string;
+  requestedName: string;
+  status: string;
+  reviewNotes?: string;
+  reviewedBy?: string;
+  requestedBy?: string;
+  createdAt?: string;
+}
+
 export interface ApiChatRoom {
   id: string;
   name?: string;
