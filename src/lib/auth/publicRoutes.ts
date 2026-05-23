@@ -5,6 +5,7 @@
 const PUBLIC_EXACT = new Set([
   '/',
   '/login',
+  '/oauth2/callback',
   '/register',
   '/forgot-password',
   '/product-listing',

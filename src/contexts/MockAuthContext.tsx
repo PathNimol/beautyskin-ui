@@ -31,6 +31,12 @@ interface MockAuthContextType {
   shopId: string | null;
   signIn: (email: string, password: string) => Promise<MockUser>;
   signInWithOAuth: (provider: OAuthProvider) => void;
+  /** Finish browser OAuth redirect (tokens in query from API success handler). */
+  completeOAuthLogin: (tokens: {
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+  }) => Promise<MockUser>;
   registerPending: (input: RegisterPendingInput) => Promise<RegisterPendingResponse>;
   confirmRegistration: (email: string, code: string) => Promise<MockUser>;
   signOut: () => Promise<void>;
@@ -198,11 +204,24 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
   );
 
   const signInWithOAuth = useCallback((provider: OAuthProvider) => {
-    // OAuth2 requires a full browser redirect — cannot use fetch (CORS blocks the redirect)
-    // Spring Security handles the flow: /oauth2/authorize → Google → /oauth2/callback → frontend
-    const redirectAfter = encodeURIComponent(window.location.pathname);
-    window.location.href = `${API_BASE.replace('/api', '')}/oauth2/authorization/${provider}?redirect=${redirectAfter}`;
+    // Spring Security: GET /oauth2/authorization/{provider} → Google → /login/oauth2/code/{provider} → UI callback
+    window.location.href = `${API_BASE.replace('/api', '')}/oauth2/authorization/${provider}`;
   }, []);
+
+  const completeOAuthLogin = useCallback(
+    async (tokens: { accessToken: string; refreshToken: string; expiresIn: number }) => {
+      saveAuthTokens(tokens);
+      const apiUser = await authApi.getMe();
+      const normalized = normalizeUser(mapApiUserToMock(apiUser));
+      protectedSessionSynced.current = true;
+      skipNextPublicLoadSession.current = true;
+      setUser(normalized);
+      localStorage.setItem(SESSION_KEY, JSON.stringify(normalized));
+      setCookie('bs_session', normalized.id);
+      return normalized;
+    },
+    []
+  );
 
   const registerPending = useCallback(async (input: RegisterPendingInput) => {
     return authApi.register({
@@ -291,6 +310,7 @@ export const MockAuthProvider = ({ children }: { children: React.ReactNode }) =>
         shopId: user?.shopId ?? null,
         signIn,
         signInWithOAuth,
+        completeOAuthLogin,
         registerPending,
         confirmRegistration,
         signOut,

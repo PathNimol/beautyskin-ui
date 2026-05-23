@@ -49,6 +49,7 @@ function LoginForm() {
   const navigatingRef = useRef(false);
 
   const redirectParam = searchParams.get('redirect');
+  const oauthError = searchParams.get('error');
 
   const goAfterLogin = useCallback(
     (redirect: string | null, role: string) => {
@@ -105,7 +106,7 @@ function LoginForm() {
       setPassword={setPassword}
       showPassword={showPassword}
       setShowPassword={setShowPassword}
-      error={error}
+      error={error || (oauthError ? decodeURIComponent(oauthError) : '')}
       loading={loading}
       handleLogin={handleLogin}
       handleOAuth={handleOAuth}
